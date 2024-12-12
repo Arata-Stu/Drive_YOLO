@@ -5,7 +5,7 @@ from typing import Callable
 from .sequence_dataset import WaymoSequenceDataset
 
 class WaymoDataset:
-    def __init__(self, root_dir, mode: str ='train', transform: Callable =None):
+    def __init__(self, root_dir, mode: str = 'train', transform: Callable = None):
         """
         全シーケンスを統合したデータセットを初期化します。
 
@@ -21,33 +21,22 @@ class WaymoDataset:
         self.mode = mode
         self.transform = transform
 
-        # 対応するモードのディレクトリをロード
         mode_dir = os.path.join(root_dir, mode)
         if not os.path.exists(mode_dir):
             raise FileNotFoundError(f"Directory for mode '{mode}' not found: {mode_dir}")
 
-        # シーケンスごとのデータセットを作成
-        self.datasets = [
-            WaymoSequenceDataset(mode_dir, mode, transform)
-        ]
+        # シーケンス単位のデータセットを構築
+        self.datasets = []
+        for sequence_id in os.listdir(mode_dir):
+            sequence_dir = os.path.join(mode_dir, sequence_id)
+            if os.path.isdir(sequence_dir):
+                self.datasets.append(WaymoSequenceDataset(sequence_dir, mode, transform))
 
-        # ConcatDatasetで統合
+        # シーケンス単位のデータセットを統合
         self.dataset = ConcatDataset(self.datasets)
 
     def __len__(self):
-        """
-        統合データセットの全サンプル数を返します。
-        """
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        """
-        統合データセットからサンプルを取得します。
-
-        Args:
-            idx (int): インデックス。
-
-        Returns:
-            dict: 統合データセットのサンプル。
-        """
         return self.dataset[idx]
