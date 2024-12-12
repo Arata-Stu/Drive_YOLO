@@ -6,28 +6,48 @@ from torch.utils.data import Dataset
 from typing import Callable
 
 class WaymoSequenceDataset(Dataset):
-    def __init__(self, sequence_dir, mode: str="train", transform: Callable=None):
+    def __init__(self, dataset_dir, mode: str="train", transform: Callable=None):
         """
-        1つのシーケンスディレクトリからデータセットを初期化します。
+        train, test, validationディレクトリ構造を持つデータセットを初期化します。
 
         Args:
-            sequence_dir (str): シーケンスディレクトリのパス。
+            dataset_dir (str): データセットディレクトリのパス。
+            mode (str): 使用するデータセットモード ('train', 'test', 'val')。
+            transform (Callable): 画像変換処理。
         """
+        assert os.path.exists(dataset_dir), f"Dataset directory not found: {dataset_dir}"
+        assert mode in ['train', 'test', 'val'], f"Invalid mode: {mode}"
 
-        assert os.path.exists(sequence_dir), f"Sequence directory not found: {sequence_dir}"
-        self.sequence_dir = sequence_dir
-        self.sequence_id = os.path.basename(sequence_dir)  # シーケンス番号を取得
-        self.annotation_path = os.path.join(sequence_dir, "annotations.json")
-        self.transform = transform
+        self.dataset_dir = dataset_dir
         self.mode = mode
+        self.sequence_dirs = []
+        self.annotations = []
+        self.transform = transform
 
-        # アノテーションファイルをロード
-        with open(self.annotation_path, "r") as f:
-            self.annotations = json.load(f)
+        # モードに応じたディレクトリを設定
+        mode_dir = os.path.join(dataset_dir, mode)
+        if not os.path.exists(mode_dir):
+            raise FileNotFoundError(f"Directory for mode '{mode}' not found: {mode_dir}")
+
+        # シーケンスごとにアノテーションを収集
+        for sequence_dir in os.listdir(mode_dir):
+            sequence_path = os.path.join(mode_dir, sequence_dir)
+            if not os.path.isdir(sequence_path):
+                continue
+            annotation_path = os.path.join(sequence_path, "annotations.json")
+            if not os.path.exists(annotation_path):
+                print(f"Warning: Annotation file not found for sequence {sequence_dir}. Skipping.")
+                continue
+
+            with open(annotation_path, "r") as f:
+                sequence_annotations = json.load(f)
+                for annotation in sequence_annotations:
+                    annotation["sequence_dir"] = sequence_path  # シーケンスディレクトリ情報を追加
+                self.annotations.extend(sequence_annotations)
 
     def __len__(self):
         """
-        シーケンス内のフレーム数を返します。
+        データセット内の総フレーム数を返します。
         """
         return len(self.annotations)
 
@@ -52,7 +72,7 @@ class WaymoSequenceDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # 画像をTensor形式に変換 (CHW形式)
-        image = torch.tensor(image).permute(2, 0, 1).float() 
+        image = torch.tensor(image).permute(2, 0, 1).float()
 
         # バウンディングボックスとクラス情報をTensor形式に変換
         if self.mode == 'train':
@@ -71,10 +91,12 @@ class WaymoSequenceDataset(Dataset):
             )
         else:
             raise ValueError(f"Invalid mode: {self.mode}")
-        
-        sequence_id_int = int(self.sequence_id)  # シーケンスIDを整数に変換
-        unique_id = sequence_id_int * 10**6 + idx  # フレームインデックスを加算
 
+        # ユニークIDを生成
+        sequence_dir = annotation["sequence_dir"]
+        sequence_id = os.path.basename(sequence_dir)
+        sequence_id_int = int(sequence_id)  # シーケンスIDを整数に変換
+        unique_id = sequence_id_int * 10**6 + idx  # フレームインデックスを加算
 
         outputs = {
             "image": image,
