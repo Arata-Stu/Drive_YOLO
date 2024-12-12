@@ -1,0 +1,9 @@
+omegaconf
+
+torch 
+torchvision
+pytorch-lightning
+
+## for waymo dataset
+waymo-open-dataset-tf-2-12-0
+Pillow
