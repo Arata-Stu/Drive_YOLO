@@ -1,5 +1,7 @@
 omegaconf
 
+opencv-python
+
 torch 
 torchvision
 pytorch-lightning

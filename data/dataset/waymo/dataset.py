@@ -2,7 +2,7 @@ import os
 from torch.utils.data import ConcatDataset
 from typing import Callable
 
-from sequence_dataset import WaymoSequenceDataset
+from .sequence_dataset import WaymoSequenceDataset
 
 class WaymoDataset:
     def __init__(self, root_dir, mode: str ='train', transform: Callable =None):

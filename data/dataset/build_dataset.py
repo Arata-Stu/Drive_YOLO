@@ -1,8 +1,8 @@
 from omegaconf import DictConfig
 from torchvision import transforms
 
-from data.data_utils.transform import ResizePaddingTransform
-from waymo.build_dataset import build_waymo_dataset
+from ..data_utils.transform import ResizePaddingTransform
+from .waymo.build_dataset import build_waymo_dataset
 
 def build_dataset(dataset_config: DictConfig, mode: str = 'train'):
 
