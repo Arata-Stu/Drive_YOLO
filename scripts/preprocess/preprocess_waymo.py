@@ -3,6 +3,7 @@ import tensorflow as tf
 import os
 import json
 from waymo_open_dataset import dataset_pb2 as open_dataset
+from colorama import Fore, Style
 
 MODE = {"traoning": "train", "testing": "test", "validation": "val"}
 
@@ -18,20 +19,17 @@ class WaymoSequencePreprocessor:
         os.makedirs(output_dir, exist_ok=True)
 
     def parse_tfrecord(self, filename):
-        """
-        TFRecordファイルをパースしてフレームを生成します。
+        
+        try:
+            dataset = tf.data.TFRecordDataset(filename, compression_type='')
+            for data in dataset:
+                frame = open_dataset.Frame()
+                frame.ParseFromString(bytearray(data.numpy()))
+                yield frame
+        except tf.errors.DataLossError as e:
+            print(f"{Fore.RED}DataLossError: {filename} is corrupted. Skipping...{Style.RESET_ALL}")
+            return
 
-        Args:
-            filename (str): TFRecordファイルのパス。
-
-        Returns:
-            generator: パースされたフレーム。
-        """
-        dataset = tf.data.TFRecordDataset(filename, compression_type='')
-        for data in dataset:
-            frame = open_dataset.Frame()
-            frame.ParseFromString(bytearray(data.numpy()))
-            yield frame
 
     def preprocess(self, input_dir, output_dir):
         """
