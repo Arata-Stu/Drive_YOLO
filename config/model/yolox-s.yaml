@@ -1,0 +1,33 @@
+model:
+  name: yolox-x
+  type: dnn
+  
+  backbone:
+    name: darknet
+    depth: 0.33
+    width: 0.50
+    input_dim: 3
+    out_features: [dark3, dark4, dark5] #choose darknet outputs 'stem', 'dark 2 ~ 5'
+    depthwise: false
+    act: "silu"
+  
+  neck:
+    name: pafpn
+    depth: ${..backbone.depth}
+    in_stages: [dark3, dark4, dark5]
+    in_channels: ???
+    depthwise: false
+    act: silu
+
+
+  head:
+    name: yolox
+    num_classes: 5 # waymo open dataset
+    strides: ???
+    in_channels: ???
+    act: silu
+    depthwise: false
+
+  postprocess:
+    conf_thre: 0.1
+    nms_thre: 0.45
