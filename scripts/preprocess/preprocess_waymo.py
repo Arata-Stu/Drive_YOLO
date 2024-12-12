@@ -92,7 +92,9 @@ class WaymoSequencePreprocessor:
                 json.dump(annotations, anno_file, indent=4)
 
 # 使用例
-output_dir = "./processed_waymo"
+project_root = os.environ.get('PROJECT_ROOT')
+data_dir = f"{project_root}/datasets"
+output_dir = f"{data_dir}/processed_waymo"
 preprocessor = WaymoSequencePreprocessor(output_dir)
 tfrecord_files = [
     "segment-10203656353524179475_7625_000_7645_000_with_camera_labels.tfrecord",
