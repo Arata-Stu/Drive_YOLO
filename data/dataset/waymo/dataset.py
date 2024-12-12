@@ -12,6 +12,8 @@ class WaymoDataset:
         Args:
             root_dir (str): 前処理済みデータのルートディレクトリ。
         """
+
+        assert root_dir is not None, "root_dir must be specified."
         self.root_dir = root_dir
         self.sequence_dirs = [
             os.path.join(root_dir, d) for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))

@@ -13,9 +13,12 @@ class WaymoSequenceDataset(Dataset):
         Args:
             sequence_dir (str): シーケンスディレクトリのパス。
         """
+
+        assert os.path.exists(sequence_dir), f"Sequence directory not found: {sequence_dir}"
         self.sequence_dir = sequence_dir
         self.annotation_path = os.path.join(sequence_dir, "annotations.json")
         self.transform = transform
+        self.mode = mode
 
         # アノテーションファイルをロード
         with open(self.annotation_path, "r") as f:
@@ -51,9 +54,23 @@ class WaymoSequenceDataset(Dataset):
         image = torch.tensor(image).permute(2, 0, 1).float() 
 
         # バウンディングボックスとクラス情報をTensor形式に変換
-        labels = torch.tensor(
-            [[bbox["center_x"], bbox["center_y"], bbox["length"], bbox["width"], bbox["class"]] for bbox in bboxes]
-        )
+        if self.mode == 'train':
+            labels = torch.tensor(
+                [[bbox["class"], bbox["center_x"], bbox["center_y"], bbox["length"], bbox["width"]] for bbox in bboxes]
+            )
+        elif self.mode in ['test', 'val']:
+            labels = torch.tensor(
+                [[
+                    bbox["center_x"] - bbox["length"] / 2,  # x = center_x - (width / 2)
+                    bbox["center_y"] - bbox["width"] / 2,   # y = center_y - (height / 2)
+                    bbox["length"],                        # width
+                    bbox["width"],                         # height
+                    bbox["class"],                         # class
+                ] for bbox in bboxes]
+            )
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+
 
         outputs = {
             "image": image,

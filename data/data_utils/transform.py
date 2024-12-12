@@ -3,14 +3,17 @@ import numpy as np
 import torch
 
 class ResizePaddingTransform:
-    def __init__(self, target_size=(640, 640)):
+    def __init__(self, target_size=(640, 640), mode="train"):
         """
         ターゲットサイズを指定して、リサイズとパディングを行うTransformを初期化。
 
         Args:
             target_size (tuple): リサイズ後のターゲットサイズ (width, height)。
+            mode (str): データのモード ("train", "val", "test")。
         """
         self.target_size = target_size
+        assert target_size[0] == target_size[1], "ターゲットサイズは正方形である必要があります。"
+        self.mode = mode
 
     def __call__(self, sample):
         """
@@ -18,14 +21,15 @@ class ResizePaddingTransform:
 
         Args:
             sample (dict): データローダーから受け取るサンプル。
-                - "image": 画像データ (numpy.ndarray)。
+                - "image": 画像データ (torch.Tensor)。
                 - "labels": バウンディングボックス情報 (torch.Tensor)。
                 - その他: 他の情報をそのまま保持。
 
         Returns:
             dict: 変換後のサンプル。
         """
-        image = sample["image"]
+        # 画像をCHW -> HWCに変換
+        image = sample["image"].permute(1, 2, 0).numpy()
         labels = sample["labels"]
         target_width, target_height = self.target_size
         original_height, original_width = image.shape[:2]
@@ -58,14 +62,58 @@ class ResizePaddingTransform:
 
         # バウンディングボックスの変換
         if labels is not None:
-            # [center_x, center_y, width, height, class] の形式
             labels = labels.clone()
-            labels[:, 0] = labels[:, 0] * scale_ratio + pad_left  # center_x
-            labels[:, 1] = labels[:, 1] * scale_ratio + pad_top   # center_y
-            labels[:, 2] = labels[:, 2] * scale_ratio            # width
-            labels[:, 3] = labels[:, 3] * scale_ratio            # height
+            if self.mode == "train":
+                # [class, center_x, center_y, width, height]
+                labels[:, 1] = labels[:, 1] * scale_ratio + pad_left  # center_x
+                labels[:, 2] = labels[:, 2] * scale_ratio + pad_top   # center_y
+                labels[:, 3] = labels[:, 3] * scale_ratio            # width
+                labels[:, 4] = labels[:, 4] * scale_ratio            # height
+            elif self.mode in ["val", "test"]:
+                # [x, y, width, height, class]
+                labels[:, 0] = labels[:, 0] * scale_ratio + pad_left  # x
+                labels[:, 1] = labels[:, 1] * scale_ratio + pad_top   # y
+                labels[:, 2] = labels[:, 2] * scale_ratio            # width
+                labels[:, 3] = labels[:, 3] * scale_ratio            # height
 
-        # サンプルを更新して返す
-        sample["image"] = padded_image
+        # 画像をHWC -> CHWに変換して戻す
+        sample["image"] = torch.tensor(padded_image).permute(2, 0, 1).float()
         sample["labels"] = labels
         return sample
+
+
+class PadLabelTransform:
+    def __init__(self, max_num_labels=50):
+        """
+        バウンディングボックスの数を最大数にパディングするTransformを初期化。
+
+        Args:
+            max_num_labels (int): パディング後のバウンディングボックスの最大数。
+        """
+        self.max_num_labels = max_num_labels
+
+    def __call__(self, sample):
+        """
+        データローダーのサンプルにバウンディングボックスのパディングを適用。
+
+        Args:
+            sample (dict): 入力サンプル。
+                - "image": 画像データ (Tensor)
+                - "labels": バウンディングボックス情報 (Tensor)
+                - 他の情報: camera_name, frame_idなど
+
+        Returns:
+            dict: パディングされたサンプル。
+        """
+        labels = sample["labels"]
+        num_labels = labels.size(0)
+
+        # パディングするためのテンソルを作成
+        padded_labels = torch.zeros((self.max_num_labels, labels.size(1)), dtype=labels.dtype)
+        padded_labels[:num_labels] = labels
+
+        # パディング後のラベルをサンプルにセット
+        sample["labels"] = padded_labels
+
+        return sample
+
