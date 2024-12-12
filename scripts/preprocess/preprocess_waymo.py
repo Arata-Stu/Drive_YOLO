@@ -5,7 +5,7 @@ import json
 from waymo_open_dataset import dataset_pb2 as open_dataset
 from colorama import Fore, Style
 
-MODE = {"traoning": "train", "testing": "test", "validation": "val"}
+MODE = {"training": "train", "testing": "test", "validation": "val"}
 
 class WaymoSequencePreprocessor:
     def __init__(self, output_dir):
@@ -19,7 +19,6 @@ class WaymoSequencePreprocessor:
         os.makedirs(output_dir, exist_ok=True)
 
     def parse_tfrecord(self, filename):
-        
         try:
             dataset = tf.data.TFRecordDataset(filename, compression_type='')
             for data in dataset:
@@ -29,7 +28,6 @@ class WaymoSequencePreprocessor:
         except tf.errors.DataLossError as e:
             print(f"{Fore.RED}DataLossError: {filename} is corrupted. Skipping...{Style.RESET_ALL}")
             return
-
 
     def preprocess(self, input_dir, output_dir):
         """
@@ -68,7 +66,13 @@ class WaymoSequencePreprocessor:
                 sequence_dir = os.path.join(subset_output_dir, sequence_id)
                 os.makedirs(sequence_dir, exist_ok=True)
 
-                annotations = []
+                camera_annotations = {  # カメラごとのアノテーションを格納
+                    "FRONT": [],
+                    "FRONT_LEFT": [],
+                    "SIDE_LEFT": [],
+                    "FRONT_RIGHT": [],
+                    "SIDE_RIGHT": []
+                }
 
                 # フレームごとに処理
                 for frame_idx, frame in enumerate(self.parse_tfrecord(filename)):
@@ -76,7 +80,7 @@ class WaymoSequencePreprocessor:
                     for camera_image in frame.images:
                         camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
 
-                        if camera_name not in ["FRONT", "FRONT_LEFT", "SIDE_LEFT", "FRONT_RIGHT", "SIDE_RIGHT"]:
+                        if camera_name not in camera_annotations.keys():
                             continue
 
                         # カメラごとのディレクトリを作成
@@ -103,16 +107,20 @@ class WaymoSequencePreprocessor:
                                 })
 
                         # フレームアノテーションを保存
-                        annotations.append({
+                        camera_annotations[camera_name].append({
                             "frame_id": frame_id,
                             "camera_name": camera_name,
                             "image_path": image_path,
                             "bboxes": bboxes
                         })
 
-                # シーケンスのアノテーションを保存
-                with open(os.path.join(sequence_dir, "annotations.json"), "w") as anno_file:
-                    json.dump(annotations, anno_file, indent=4)
+                # カメラごとのアノテーションを保存
+                for camera_name, annotations in camera_annotations.items():
+                    camera_anno_path = os.path.join(sequence_dir, "annotations", camera_name)
+                    os.makedirs(camera_anno_path, exist_ok=True)
+                    anno_file_path = os.path.join(camera_anno_path, "annotations.json")
+                    with open(anno_file_path, "w") as anno_file:
+                        json.dump(annotations, anno_file, indent=4)
 
 
 if __name__ == "__main__":
