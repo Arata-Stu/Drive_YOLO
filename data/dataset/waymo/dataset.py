@@ -11,16 +11,25 @@ class WaymoDataset:
 
         Args:
             root_dir (str): 前処理済みデータのルートディレクトリ。
+            mode (str): 使用するデータセットモード ('train', 'test', 'val')。
+            transform (Callable): 画像変換処理。
         """
-
         assert root_dir is not None, "root_dir must be specified."
+        assert mode in ['train', 'test', 'val'], f"Invalid mode: {mode}"
+
         self.root_dir = root_dir
-        self.sequence_dirs = [
-            os.path.join(root_dir, d) for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))
-        ]
+        self.mode = mode
+        self.transform = transform
+
+        # 対応するモードのディレクトリをロード
+        mode_dir = os.path.join(root_dir, mode)
+        if not os.path.exists(mode_dir):
+            raise FileNotFoundError(f"Directory for mode '{mode}' not found: {mode_dir}")
 
         # シーケンスごとのデータセットを作成
-        self.datasets = [WaymoSequenceDataset(seq_dir, mode, transform) for seq_dir in self.sequence_dirs]
+        self.datasets = [
+            WaymoSequenceDataset(mode_dir, mode, transform)
+        ]
 
         # ConcatDatasetで統合
         self.dataset = ConcatDataset(self.datasets)

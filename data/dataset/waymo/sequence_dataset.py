@@ -20,18 +20,16 @@ class WaymoSequenceDataset(Dataset):
 
         self.dataset_dir = dataset_dir
         self.mode = mode
-        self.sequence_dirs = []
         self.annotations = []
         self.transform = transform
 
-        # モードに応じたディレクトリを設定
-        mode_dir = os.path.join(dataset_dir, mode)
-        if not os.path.exists(mode_dir):
-            raise FileNotFoundError(f"Directory for mode '{mode}' not found: {mode_dir}")
+    
+        if not os.path.exists(self.dataset_dir):
+            raise FileNotFoundError(f"Directory for mode '{mode}' not found: {self.dataset_dir}")
 
         # シーケンスごとにアノテーションを収集
-        for sequence_dir in os.listdir(mode_dir):
-            sequence_path = os.path.join(mode_dir, sequence_dir)
+        for sequence_dir in os.listdir(self.dataset_dir):
+            sequence_path = os.path.join(self.dataset_dir, sequence_dir)
             if not os.path.isdir(sequence_path):
                 continue
             annotation_path = os.path.join(sequence_path, "annotations.json")
@@ -75,22 +73,15 @@ class WaymoSequenceDataset(Dataset):
         image = torch.tensor(image).permute(2, 0, 1).float()
 
         # バウンディングボックスとクラス情報をTensor形式に変換
-        if self.mode == 'train':
-            labels = torch.tensor(
-                [[bbox["class"], bbox["center_x"], bbox["center_y"], bbox["length"], bbox["width"]] for bbox in bboxes]
-            )
-        elif self.mode in ['test', 'val']:
-            labels = torch.tensor(
-                [[
-                    bbox["center_x"] - bbox["length"] / 2,  # x = center_x - (width / 2)
-                    bbox["center_y"] - bbox["width"] / 2,   # y = center_y - (height / 2)
-                    bbox["length"],                        # width
-                    bbox["width"],                         # height
-                    bbox["class"],                         # class
-                ] for bbox in bboxes]
-            )
-        else:
-            raise ValueError(f"Invalid mode: {self.mode}")
+        labels = torch.tensor(
+            [[
+                bbox["center_x"] - bbox["length"] / 2,  # x = center_x - (width / 2)
+                bbox["center_y"] - bbox["width"] / 2,   # y = center_y - (height / 2)
+                bbox["length"],                        # width
+                bbox["width"],                         # height
+                bbox["class"],                         # class
+            ] for bbox in bboxes]
+        )
 
         # ユニークIDを生成
         sequence_dir = annotation["sequence_dir"]
