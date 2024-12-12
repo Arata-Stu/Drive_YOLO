@@ -1,6 +1,7 @@
 omegaconf
 colorama
 
+scipy
 opencv-python
 
 torch 
@@ -13,3 +14,6 @@ Pillow
 
 ## for eval
 pycocotools
+
+## for ByteTrack
+cython_bbox
