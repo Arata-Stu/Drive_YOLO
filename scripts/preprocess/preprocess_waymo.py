@@ -1,7 +1,9 @@
+import argparse
 import tensorflow as tf
 import os
 import json
 from waymo_open_dataset import dataset_pb2 as open_dataset
+
 
 class WaymoSequencePreprocessor:
     def __init__(self, output_dir):
@@ -30,14 +32,20 @@ class WaymoSequencePreprocessor:
             frame.ParseFromString(bytearray(data.numpy()))
             yield frame
 
-    def preprocess(self, filenames):
+    def preprocess(self, input_dir, output_dir):
         """
-        TFRecordファイルをシーケンスごとに処理し、画像とアノテーションを保存します。
-        
+        入力ディレクトリ内のすべてのTFRecordファイルを処理します。
+
         Args:
-            filenames (list): TFRecordファイルのパスリスト。
+            input_dir (str): TFRecordファイルが格納されたディレクトリ。
+            output_dir (str): 処理後のデータを保存するディレクトリ。
         """
-        for filename in filenames:
+        self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
+
+        tfrecord_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(".tfrecord")]
+
+        for filename in tfrecord_files:
             # ファイル名からIDを抽出
             base_name = os.path.basename(filename)
             sequence_id = base_name.split('_')[0].replace('segment-', '')
@@ -58,7 +66,7 @@ class WaymoSequencePreprocessor:
 
                     if camera_name not in ["FRONT", "FRONT_LEFT", "SIDE_LEFT", "FRONT_RIGHT", "SIDE_RIGHT"]:
                         continue
-                    
+
                     # カメラごとのディレクトリを作成
                     camera_dir = os.path.join(sequence_dir, "images", camera_name)
                     os.makedirs(camera_dir, exist_ok=True)
@@ -94,12 +102,19 @@ class WaymoSequencePreprocessor:
             with open(os.path.join(sequence_dir, "annotations.json"), "w") as anno_file:
                 json.dump(annotations, anno_file, indent=4)
 
-# 使用例
-project_root = os.environ.get('PROJECT_ROOT')
-data_dir = f"{project_root}/datasets"
-output_dir = f"{data_dir}/processed_waymo"
-preprocessor = WaymoSequencePreprocessor(output_dir)
-tfrecord_files = [
-    "/mnt/2TB_ssd/waymo/validation/segment-10203656353524179475_7625_000_7645_000_with_camera_labels.tfrecord",
-]
-preprocessor.preprocess(tfrecord_files)
+
+if __name__ == "__main__":
+    # コマンドライン引数の処理
+    parser = argparse.ArgumentParser(description="Waymo TFRecord Preprocessor")
+    parser.add_argument("-i", "--input", required=True, help="Input directory containing TFRecord files")
+    parser.add_argument("-o", "--output", required=True, help="Output directory to save processed data")
+
+    args = parser.parse_args()
+
+    # 入力と出力ディレクトリの指定
+    input_dir = args.input
+    output_dir = args.output
+
+    # 前処理実行
+    preprocessor = WaymoSequencePreprocessor(output_dir)
+    preprocessor.preprocess(input_dir, output_dir)
