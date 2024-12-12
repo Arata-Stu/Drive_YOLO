@@ -47,7 +47,6 @@ class WaymoSequencePreprocessor:
             # シーケンス用ディレクトリを作成
             sequence_dir = os.path.join(self.output_dir, sequence_id)
             os.makedirs(sequence_dir, exist_ok=True)
-            os.makedirs(os.path.join(sequence_dir, "images"), exist_ok=True)
 
             annotations = []
 
@@ -60,8 +59,12 @@ class WaymoSequencePreprocessor:
                     if camera_name not in ["FRONT", "FRONT_LEFT", "SIDE_LEFT", "FRONT_RIGHT", "SIDE_RIGHT"]:
                         continue
                     
+                    # カメラごとのディレクトリを作成
+                    camera_dir = os.path.join(sequence_dir, "images", camera_name)
+                    os.makedirs(camera_dir, exist_ok=True)
+
                     # 画像を保存
-                    image_path = os.path.join(sequence_dir, "images", f"{frame_id}_{camera_name}.jpg")
+                    image_path = os.path.join(camera_dir, f"{frame_id}.jpg")
                     with open(image_path, "wb") as img_file:
                         img_file.write(camera_image.image)
 
@@ -97,6 +100,6 @@ data_dir = f"{project_root}/datasets"
 output_dir = f"{data_dir}/processed_waymo"
 preprocessor = WaymoSequencePreprocessor(output_dir)
 tfrecord_files = [
-    "segment-10203656353524179475_7625_000_7645_000_with_camera_labels.tfrecord",
+    "/mnt/2TB_ssd/waymo/validation/segment-10203656353524179475_7625_000_7645_000_with_camera_labels.tfrecord",
 ]
 preprocessor.preprocess(tfrecord_files)
