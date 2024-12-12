@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 from models.models import get_detector
 from utils.eval.evaluator import Evaluator
 from models.yolox.utils.boxes import postprocess
-from utils.eval.prophesee.io.box_loading import to_prophesee
+from utils.eval.io.box_loading import to_prophesee
 
 
 class DNNModule(pl.LightningModule):
@@ -73,6 +73,7 @@ class DNNModule(pl.LightningModule):
         
         imgs = batch['image'].to(dtype=self.dtype)  
         labels = batch['labels'].to(dtype=self.dtype)  
+        data_id = batch['unique_id']
         labels.requires_grad = False
 
         preds = self.model(imgs)
@@ -80,7 +81,7 @@ class DNNModule(pl.LightningModule):
         processed_preds = self.post_process(prediction=preds)
 
         loaded_labels_proph, yolox_preds_proph = to_prophesee(loaded_label_tensor=labels, 
-                                                              label_timestamps=timestamps, 
+                                                              label_timestamps=data_id, 
                                                               yolox_pred_list=processed_preds)
 
         if self.started_training:
@@ -106,6 +107,7 @@ class DNNModule(pl.LightningModule):
         
         imgs = batch['image'].to(dtype=self.dtype)  
         labels = batch['labels'].to(dtype=self.dtype)  
+        data_id = batch['unique_id']
         labels.requires_grad = False
 
         preds = self.model(imgs)
@@ -113,7 +115,7 @@ class DNNModule(pl.LightningModule):
         processed_preds = self.post_process(prediction=preds)
 
         loaded_labels_proph, yolox_preds_proph = to_prophesee(loaded_label_tensor=labels, 
-                                                              label_timestamps=timestamps, 
+                                                              label_timestamps=data_id, 
                                                               yolox_pred_list=processed_preds)
 
 
