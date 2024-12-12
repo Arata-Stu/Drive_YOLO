@@ -1,4 +1,5 @@
 omegaconf
+colorama
 
 opencv-python
 
