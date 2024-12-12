@@ -16,6 +16,7 @@ class WaymoSequenceDataset(Dataset):
 
         assert os.path.exists(sequence_dir), f"Sequence directory not found: {sequence_dir}"
         self.sequence_dir = sequence_dir
+        self.sequence_id = os.path.basename(sequence_dir)  # シーケンス番号を取得
         self.annotation_path = os.path.join(sequence_dir, "annotations.json")
         self.transform = transform
         self.mode = mode
@@ -70,6 +71,9 @@ class WaymoSequenceDataset(Dataset):
             )
         else:
             raise ValueError(f"Invalid mode: {self.mode}")
+        
+        sequence_id_int = int(self.sequence_id)  # シーケンスIDを整数に変換
+        unique_id = sequence_id_int * 10**6 + idx  # フレームインデックスを加算
 
 
         outputs = {
@@ -77,6 +81,7 @@ class WaymoSequenceDataset(Dataset):
             "labels": labels,
             "camera_name": annotation["camera_name"],
             "frame_id": annotation["frame_id"],
+            "unique_id": unique_id,
         }
 
         if self.transform is not None:
