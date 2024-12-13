@@ -1,4 +1,5 @@
-CLASS = {"unknown": 0, "vehicle": 1, "pedestrian": 2, "sign": 3, "cyclist": 4}
+ORIG_CLASS = {"unknown": 0, "vehicle": 1, "pedestrian": 2, "sign": 3, "cyclist": 4}
+MY_CLASS = {"vehicle": 0, "pedestrian": 1, "cyclist": 2}
 
 CAMERA_HW = {
     "FRONT": (1280, 1920),

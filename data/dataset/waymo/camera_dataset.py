@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from typing import Callable
 
 class WaymoCameraDataset(Dataset):
-    def __init__(self, sequence_dir, camera_name, mode: str = "train" ,transform: Callable = None):
+    def __init__(self, sequence_dir, camera_name, mode: str = "train", transform: Callable = None):
         """
         カメラ位置単位のデータセットを初期化します。
 
@@ -32,22 +32,38 @@ class WaymoCameraDataset(Dataset):
         return len(self.annotations)
 
     def __getitem__(self, idx):
-        annotation = self.annotations[idx]
-        image_path = annotation["image_path"]
-        bboxes = annotation["bboxes"]
+        try:
+            annotation = self.annotations[idx]
+        except IndexError:
+            raise ValueError(f"Index {idx} is out of range for annotations of length {len(self.annotations)}.")
+
+        image_path = annotation.get("image_path")
+        if not image_path or not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image path not found or invalid: {image_path}")
 
         # 画像をロード
         image = cv2.imread(image_path)
         if image is None:
-            raise FileNotFoundError(f"Image not found: {image_path}")
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            raise ValueError(f"Failed to load image at path: {image_path}")
+        try:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        except Exception as e:
+            raise ValueError(f"Error converting image to RGB format at {image_path}: {e}")
 
-        # 画像をTensor形式に変換
-        image = torch.tensor(image).permute(2, 0, 1).float()
+        try:
+            # 画像をTensor形式に変換
+            image = torch.tensor(image.copy()).permute(2, 0, 1).float()
+        except Exception as e:
+            raise ValueError(f"Error converting image to tensor: {e}")
 
-        # バウンディングボックスをTensor形式に変換
-        if self.mode == "train":
-            ## バウンディングボックスの形式をcls, cx, cy, w, hに変換
+        # ラベル情報を処理
+        bboxes = annotation.get("bboxes", [])
+        if not isinstance(bboxes, list):
+            raise ValueError(f"Invalid bounding box data for index {idx}: {bboxes}")
+
+        try:
+            
+            # バウンディングボックスの形式をcls, cx, cy, w, hに変換
             labels = torch.tensor(
                 [[
                     bbox["class"],
@@ -55,23 +71,19 @@ class WaymoCameraDataset(Dataset):
                     bbox["center_y"],
                     bbox["length"],
                     bbox["width"],
-                ] for bbox in bboxes]
-            )
-        elif self.mode == "test" or self.mode == "val":
-            ## バウンディングボックスの形式をx, y, w, hに変換
-            labels = torch.tensor(
-                [[
-                    bbox["center_x"] - bbox["length"] / 2,
-                    bbox["center_y"] - bbox["width"] / 2,
-                    bbox["length"],
-                    bbox["width"],
-                    bbox["class"]
-                ] for bbox in bboxes]
-            )
+                ] for bbox in bboxes],
+                dtype=torch.float32)
+                
+        except Exception as e:
+            raise ValueError(f"Error processing bounding boxes for index {idx}: {e}")
 
         # ユニークIDを生成
         sequence_id = os.path.basename(self.sequence_dir)
-        sequence_id_int = int(sequence_id)  # シーケンスIDを整数に変換
+        try:
+            sequence_id_int = int(sequence_id)  # シーケンスIDを整数に変換
+        except ValueError as e:
+            raise ValueError(f"Invalid sequence ID: {sequence_id}. It must be an integer.")
+
         unique_id = sequence_id_int * 10**6 + idx  # フレームインデックスを加算
 
         outputs = {
@@ -82,7 +94,11 @@ class WaymoCameraDataset(Dataset):
             "unique_id": unique_id,
         }
 
+        # トランスフォームを適用
         if self.transform is not None:
-            outputs = self.transform(outputs)
+            try:
+                outputs = self.transform(outputs)
+            except Exception as e:
+                raise ValueError(f"Error applying transform to data: {e}")
 
         return outputs
