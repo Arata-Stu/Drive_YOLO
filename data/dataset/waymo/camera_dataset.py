@@ -62,20 +62,24 @@ class WaymoCameraDataset(Dataset):
             raise ValueError(f"Invalid bounding box data for index {idx}: {bboxes}")
 
         try:
-            
-            # バウンディングボックスの形式をcls, cx, cy, w, hに変換
-            labels = torch.tensor(
-                [[
-                    bbox["class"],
-                    bbox["center_x"],
-                    bbox["center_y"],
-                    bbox["length"],
-                    bbox["width"],
-                ] for bbox in bboxes],
-                dtype=torch.float32)
-                
+            if len(bboxes) == 0:
+                # バウンディングボックスがない場合にゼロ埋めのテンソルを生成
+                labels = torch.empty((0, 5), dtype=torch.float32)
+            else:
+                # バウンディングボックスの形式を cls, cx, cy, w, h に変換
+                labels = torch.tensor(
+                    [[
+                        bbox["class"],
+                        bbox["center_x"],
+                        bbox["center_y"],
+                        bbox["length"],
+                        bbox["width"],
+                    ] for bbox in bboxes],
+                    dtype=torch.float32
+                )
         except Exception as e:
             raise ValueError(f"Error processing bounding boxes for index {idx}: {e}")
+
 
         # ユニークIDを生成
         sequence_id = os.path.basename(self.sequence_dir)
@@ -84,7 +88,9 @@ class WaymoCameraDataset(Dataset):
         except ValueError as e:
             raise ValueError(f"Invalid sequence ID: {sequence_id}. It must be an integer.")
 
-        unique_id = sequence_id_int * 10**6 + idx  # フレームインデックスを加算
+        # print(sequence_id_int)
+        unique_id = int(sequence_id_int * 1_000_000 + idx) // 100000000
+
 
         outputs = {
             "image": image,
@@ -97,7 +103,9 @@ class WaymoCameraDataset(Dataset):
         # トランスフォームを適用
         if self.transform is not None:
             try:
+                
                 outputs = self.transform(outputs)
+                # print("After transform:", outputs.get("image", None)..shape)
             except Exception as e:
                 raise ValueError(f"Error applying transform to data: {e}")
 
