@@ -2,18 +2,19 @@ import cv2
 import numpy as np
 import torch
 
-class ResizePaddingTransform:
-    def __init__(self, target_size=(640, 640), mode="train"):
+class ResizeTransform:
+    def __init__(self, input_size=(640, 640), swap=(2, 0, 1)):
         """
-        ターゲットサイズを指定して、リサイズとパディングを行うTransformを初期化。
+        リサイズとパディングを行う前処理Transformを初期化。
 
         Args:
-            target_size (tuple): リサイズ後のターゲットサイズ (width, height)。
-            mode (str): データのモード ("train", "val", "test")。
+            input_size (tuple): リサイズ後のターゲットサイズ (height, width)。
+            mean (list or None): ピクセル値の平均値 (正規化用)。
+            std (list or None): ピクセル値の標準偏差 (正規化用)。
+            swap (tuple): チャンネルの順序 (デフォルトは (2, 0, 1))。
         """
-        self.target_size = target_size
-        assert target_size[0] == target_size[1], "ターゲットサイズは正方形である必要があります。"
-        self.mode = mode
+        self.input_size = input_size
+        self.swap = swap
 
     def __call__(self, sample):
         """
@@ -28,59 +29,93 @@ class ResizePaddingTransform:
         Returns:
             dict: 変換後のサンプル。
         """
-        # 画像をCHW -> HWCに変換
-        image = sample["image"].permute(1, 2, 0).numpy()
+        image = sample["image"].permute(1, 2, 0).numpy()  # CHW -> HWC
         labels = sample["labels"]
-        target_width, target_height = self.target_size
+        input_height, input_width = self.input_size
+
+        # 元画像のリサイズ比率を計算
         original_height, original_width = image.shape[:2]
+        scale_ratio = min(input_height / original_height, input_width / original_width)
 
-        # アスペクト比を維持するスケール比率を計算
-        width_ratio = target_width / original_width
-        height_ratio = target_height / original_height
-        scale_ratio = min(width_ratio, height_ratio)
-
-        # 新しいサイズを計算
+        # リサイズ後のサイズを計算
         new_width = int(original_width * scale_ratio)
         new_height = int(original_height * scale_ratio)
 
-        # 画像をリサイズ
-        resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        # リサイズされた画像を作成
+        resized_img = cv2.resize(
+            image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
+        ).astype(np.float32)
 
-        # パディングの計算 (右下にパディング)
-        pad_top = 0
-        pad_left = 0
-        pad_bottom = target_height - new_height
-        pad_right = target_width - new_width
+        # パディング画像を初期化 (114で埋める)
+        padded_img = np.ones((input_height, input_width, 3), dtype=np.float32) * 114.0
 
-        # パディングを追加して正方形にする
-        padded_image = cv2.copyMakeBorder(
-            resized_image,
-            pad_top, pad_bottom, pad_left, pad_right,
-            borderType=cv2.BORDER_CONSTANT,
-            value=(0, 0, 0)  # 黒でパディング
-        )
+        # リサイズ画像を左上から埋め込む
+        padded_img[:new_height, :new_width, :] = resized_img
+
+        # チャンネル順序を変更
+        padded_img = padded_img.transpose(self.swap)
+        padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
 
         # バウンディングボックスの変換
         if labels is not None:
             labels = labels.clone()
-            if self.mode == "train":
-                # [class, center_x, center_y, width, height]
-                labels[:, 1] = labels[:, 1] * scale_ratio + pad_left  # center_x
-                labels[:, 2] = labels[:, 2] * scale_ratio + pad_top   # center_y
-                labels[:, 3] = labels[:, 3] * scale_ratio            # width
-                labels[:, 4] = labels[:, 4] * scale_ratio            # height
-            elif self.mode in ["val", "test"]:
-                # [x, y, width, height, class]
-                labels[:, 0] = labels[:, 0] * scale_ratio + pad_left  # x
-                labels[:, 1] = labels[:, 1] * scale_ratio + pad_top   # y
-                labels[:, 2] = labels[:, 2] * scale_ratio            # width
-                labels[:, 3] = labels[:, 3] * scale_ratio            # height
+            # ラベルのスケール変換
+            labels[:, 1:] *= scale_ratio  # [center_x, center_y, width, height]
 
-        # 画像をHWC -> CHWに変換して戻す
-        sample["image"] = torch.tensor(padded_image).permute(2, 0, 1).float()
+        # 画像をtorch.Tensorに変換
+        sample["image"] = torch.tensor(padded_img)
         sample["labels"] = labels
+
         return sample
 
+class FlipTransform:
+    def __init__(self, flip_horizontal=True, flip_vertical=False):
+        """
+        画像とラベルに対して水平反転および垂直反転を行うクラス。
+
+        Args:
+            flip_horizontal (bool): 水平反転を行うかどうか。
+            flip_vertical (bool): 垂直反転を行うかどうか。
+        """
+        self.flip_horizontal = flip_horizontal
+        self.flip_vertical = flip_vertical
+
+    def __call__(self, sample):
+        """
+        サンプルに反転操作を適用。
+
+        Args:
+            sample (dict): データローダーから受け取るサンプル。
+                - "image": 画像データ (torch.Tensor, CHWフォーマット)。
+                - "labels": バウンディングボックス情報 (torch.Tensor)。
+                  ラベルフォーマット: [cls, cx, cy, w, h]
+
+        Returns:
+            dict: 変換後のサンプル。
+        """
+        image = sample["image"].numpy()  # torch.Tensor -> numpy (CHW形式)
+        labels = sample["labels"]
+        C, H, W = image.shape
+
+        # 水平反転
+        if self.flip_horizontal:
+            image = image[:, :, ::-1]  # 水平方向に反転
+            if labels is not None:
+                labels = labels.clone()
+                labels[:, 1] = W - labels[:, 1]  # cx = W - cx
+
+        # 垂直反転
+        if self.flip_vertical:
+            image = image[:, ::-1, :]  # 垂直方向に反転
+            if labels is not None:
+                labels = labels.clone()
+                labels[:, 2] = H - labels[:, 2]  # cy = H - cy
+
+        # numpy -> torch.Tensor に戻す
+        sample["image"] = torch.tensor(image, dtype=torch.float32)
+        sample["labels"] = labels
+
+        return sample
 
 class PadLabelTransform:
     def __init__(self, max_num_labels=50):
