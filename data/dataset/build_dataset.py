@@ -12,7 +12,7 @@ def build_dataset(dataset_config: DictConfig, mode: str = 'train'):
 
     resize = ResizeTransform(input_size=target_size)
     label_filter = MyFilter(orig_class=ORIG_CLASS, my_class=MY_CLASS)
-    label_pad = PadLabelTransform(max_num_labels=100)
+    label_pad = PadLabelTransform(max_num_labels=300)
     flip = FlipTransform(flip_horizontal=True, flip_vertical=False)
     yolo_transform = YOLOXTransform(mode=mode)
     _transform = [resize, label_filter, flip, label_pad, yolo_transform]

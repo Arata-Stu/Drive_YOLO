@@ -4,31 +4,10 @@ import torch
 
 class ResizeTransform:
     def __init__(self, input_size=(640, 640), swap=(2, 0, 1)):
-        """
-        リサイズとパディングを行う前処理Transformを初期化。
-
-        Args:
-            input_size (tuple): リサイズ後のターゲットサイズ (height, width)。
-            mean (list or None): ピクセル値の平均値 (正規化用)。
-            std (list or None): ピクセル値の標準偏差 (正規化用)。
-            swap (tuple): チャンネルの順序 (デフォルトは (2, 0, 1))。
-        """
         self.input_size = input_size
         self.swap = swap
 
     def __call__(self, sample):
-        """
-        データローダーのサンプルにリサイズとパディングを適用。
-
-        Args:
-            sample (dict): データローダーから受け取るサンプル。
-                - "image": 画像データ (torch.Tensor)。
-                - "labels": バウンディングボックス情報 (torch.Tensor)。
-                - その他: 他の情報をそのまま保持。
-
-        Returns:
-            dict: 変換後のサンプル。
-        """
         image = sample["image"].permute(1, 2, 0).numpy()  # CHW -> HWC
         labels = sample["labels"]
         input_height, input_width = self.input_size
@@ -58,8 +37,7 @@ class ResizeTransform:
 
         # バウンディングボックスの変換
         if labels is not None:
-            labels = labels.clone()
-            # ラベルのスケール変換
+            labels = labels.clone().to(torch.float32)  # 型をtorch.float32に変換
             labels[:, 1:] *= scale_ratio  # [center_x, center_y, width, height]
 
         # 画像をtorch.Tensorに変換
@@ -67,6 +45,7 @@ class ResizeTransform:
         sample["labels"] = labels
 
         return sample
+
 
 class FlipTransform:
     def __init__(self, flip_horizontal=True, flip_vertical=False):
