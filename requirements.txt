@@ -1,6 +1,7 @@
 omegaconf
 colorama
 tqdm
+loguru
 
 scipy
 opencv-python

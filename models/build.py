@@ -29,7 +29,7 @@ def build_neck(neck_config: DictConfig, in_channels):
 
         neck = YOLOPAFPN(
             depth=neck_config.depth,  
-            in_stages=neck_config.in_stages,  
+            in_features=neck_config.in_stages,  
             in_channels=in_channels,  
             depthwise=neck_config.depthwise,  
             act=neck_config.act  

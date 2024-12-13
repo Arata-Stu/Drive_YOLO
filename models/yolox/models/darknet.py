@@ -4,6 +4,7 @@
 
 """
 modification adding
+CSPDarknet
 - get_stage_dims
 - get_strides
 """
@@ -104,6 +105,7 @@ class CSPDarknet(nn.Module):
         self,
         dep_mul,
         wid_mul,
+        input_dim=3,
         out_features=("dark3", "dark4", "dark5"),
         depthwise=False,
         act="silu",
@@ -113,13 +115,21 @@ class CSPDarknet(nn.Module):
         self.out_features = out_features
         Conv = DWConv if depthwise else BaseConv
 
-        base_channels = int(wid_mul * 64)  # 64
-        base_depth = max(round(dep_mul * 3), 1)  # 3
+        # Initialize base_channels and base_depth
+        base_channels = int(wid_mul * 64)
+        base_depth = max(round(dep_mul * 3), 1)
+
+        # Initialize dictionaries to store input and output dimensions of each block
+        self.input_dims = {}
+        self.out_dims = {}
 
         # stem
-        self.stem = Focus(3, base_channels, ksize=3, act=act)
+        self.stem = Focus(input_dim, base_channels, ksize=3, act=act)
+        self.input_dims["stem"] = (input_dim, "H", "W")  # 初期入力チャンネルは3（RGB画像）
+        self.out_dims["stem"] = (base_channels, "H/2", "W/2")
 
         # dark2
+        self.input_dims["dark2"] = self.out_dims["stem"]
         self.dark2 = nn.Sequential(
             Conv(base_channels, base_channels * 2, 3, 2, act=act),
             CSPLayer(
@@ -130,8 +140,10 @@ class CSPDarknet(nn.Module):
                 act=act,
             ),
         )
+        self.out_dims["dark2"] = (base_channels * 2, "H/4", "W/4")
 
         # dark3
+        self.input_dims["dark3"] = self.out_dims["dark2"]
         self.dark3 = nn.Sequential(
             Conv(base_channels * 2, base_channels * 4, 3, 2, act=act),
             CSPLayer(
@@ -142,8 +154,10 @@ class CSPDarknet(nn.Module):
                 act=act,
             ),
         )
+        self.out_dims["dark3"] = (base_channels * 4, "H/8", "W/8")
 
         # dark4
+        self.input_dims["dark4"] = self.out_dims["dark3"]
         self.dark4 = nn.Sequential(
             Conv(base_channels * 4, base_channels * 8, 3, 2, act=act),
             CSPLayer(
@@ -154,8 +168,10 @@ class CSPDarknet(nn.Module):
                 act=act,
             ),
         )
+        self.out_dims["dark4"] = (base_channels * 8, "H/16", "W/16")
 
         # dark5
+        self.input_dims["dark5"] = self.out_dims["dark4"]
         self.dark5 = nn.Sequential(
             Conv(base_channels * 8, base_channels * 16, 3, 2, act=act),
             SPPBottleneck(base_channels * 16, base_channels * 16, activation=act),
@@ -168,6 +184,7 @@ class CSPDarknet(nn.Module):
                 act=act,
             ),
         )
+        self.out_dims["dark5"] = (base_channels * 16, "H/32", "W/32")
 
     def forward(self, x):
         outputs = {}

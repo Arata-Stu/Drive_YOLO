@@ -20,7 +20,6 @@ Namely, we apply 2 different filters:
 modifications:
 - remove time filter
 """
-from __future__ import print_function
 import numpy as np
 
 

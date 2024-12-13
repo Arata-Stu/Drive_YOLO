@@ -5,7 +5,7 @@ import cv2
 import math
 
 
-from data.dataset.waymo.data_info import CLASS
+from data.dataset.waymo.data_info import MY_CLASS   
 
 def visualize_sequence_from_dataset(dataset, frame_indices: list, mode='train', cols=4):
     """
@@ -22,13 +22,10 @@ def visualize_sequence_from_dataset(dataset, frame_indices: list, mode='train', 
         (255, 0, 0),    # クラス0: 赤
         (0, 255, 0),    # クラス1: 緑
         (0, 0, 255),    # クラス2: 青
-        (255, 255, 0),  # クラス3: 黄色
-        (255, 0, 255),  # クラス4: マゼンタ
-        (0, 255, 255),  # クラス5: シアン
     ]
 
     # クラス名を取得
-    class_names = {v: k for k, v in CLASS.items()}
+    class_names = {v: k for k, v in MY_CLASS.items()}
 
     # 行数と列数を計算
     num_frames = len(frame_indices)

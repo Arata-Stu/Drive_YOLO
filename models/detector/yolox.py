@@ -9,16 +9,16 @@ class YOLOXDetector(nn.Module):
                  model_cfg: DictConfig):
         super().__init__()
         backbone_cfg = model_cfg.backbone
-        fpn_cfg = model_cfg.fpn
+        neck_cfg = model_cfg.neck
         head_cfg = model_cfg.head
 
         self.backbone = build_backbone(backbone_cfg)
 
-        in_channels = self.backbone.get_stage_dims(fpn_cfg.in_stages)
+        in_channels = self.backbone.get_stage_dims(neck_cfg.in_stages)
         print('inchannels:', in_channels)
-        self.neck = build_neck(fpn_cfg, in_channels=in_channels)
+        self.neck = build_neck(neck_cfg, in_channels=in_channels)
         
-        strides = self.backbone.get_strides(fpn_cfg.in_stages)
+        strides = self.backbone.get_strides(neck_cfg.in_stages)
         print('strides:', strides)
         self.head = build_head(head_cfg, in_channels=in_channels, strides=strides)
 

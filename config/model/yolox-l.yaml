@@ -22,7 +22,7 @@ model:
 
   head:
     name: yolox
-    num_classes: 5 # waymo open dataset
+    num_classes: 3 # waymo open dataset
     strides: ???
     in_channels: ???
     act: silu

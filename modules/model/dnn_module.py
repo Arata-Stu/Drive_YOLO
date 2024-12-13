@@ -17,15 +17,15 @@ class DNNModule(pl.LightningModule):
 
         self.full_config = full_config
 
-        if self.full_config.dataset.name == "gen1":
-            from data.dataset.waymo.data_info import CLASS 
+        if self.full_config.dataset.name == "waymo":
+            from data.dataset.waymo.data_info import MY_CLASS 
             self.height, self.width = 640, 640
         else:
             NotImplementedError(f"Dataset {self.full_config.dataset.name} not supported.")
         
         
-        self.classes = CLASS  # クラスを保持
-        self.model = get_detector(model_config=full_config.model)
+        self.classes = MY_CLASS  # クラスを保持
+        self.model = get_detector(model_cfg=full_config.model)
 
         self.post_process = partial(postprocess,
                                     num_classes=full_config.model.head.num_classes,
