@@ -4,6 +4,7 @@ import os
 import json
 from waymo_open_dataset import dataset_pb2 as open_dataset
 from colorama import Fore, Style
+from tqdm import tqdm
 
 MODE = {"training": "train", "testing": "test", "validation": "val"}
 
@@ -55,7 +56,7 @@ class WaymoSequencePreprocessor:
                 os.path.join(subset_input_dir, f) for f in os.listdir(subset_input_dir) if f.endswith(".tfrecord")
             ]
 
-            for filename in tfrecord_files:
+            for filename in tqdm(tfrecord_files, desc=f"Processing {subset} sequences"):
                 # ファイル名からIDを抽出
                 base_name = os.path.basename(filename)
                 sequence_id = base_name.split('_')[0].replace('segment-', '')

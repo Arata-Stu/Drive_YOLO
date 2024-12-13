@@ -1,6 +1,7 @@
 import os
 import argparse
 import tensorflow as tf
+from tqdm import tqdm
 
 def validate_tfrecord(file_path):
     """
@@ -19,18 +20,19 @@ def check_tfrecords(directory, memo_file="corrupted_files.txt"):
     ディレクトリ内の全てのTFRecordファイルを検証し、破損ファイルを記録する。
     """
     corrupted_files = []
-    total_files = 0
+    tfrecord_files = []
 
-    # ディレクトリ内のすべてのファイルを検証
+    # ディレクトリ内のTFRecordファイルを収集
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith(".tfrecord"):
-                total_files += 1
-                file_path = os.path.join(root, file)
-                print(f"Checking {file_path} ...")
-                if not validate_tfrecord(file_path):
-                    print(f"\033[91m[ERROR] Corrupted file: {file_path}\033[0m")
-                    corrupted_files.append(file)
+                tfrecord_files.append(os.path.join(root, file))
+
+    # ファイルを検証
+    for file_path in tqdm(tfrecord_files, desc="Validating TFRecord files"):
+        if not validate_tfrecord(file_path):
+            print(f"\033[91m[ERROR] Corrupted file: {file_path}\033[0m")
+            corrupted_files.append(os.path.basename(file_path))
 
     # メモファイルに記録
     if corrupted_files:
@@ -41,7 +43,7 @@ def check_tfrecords(directory, memo_file="corrupted_files.txt"):
     else:
         print("\033[92mAll files are valid.\033[0m")
 
-    print(f"Checked {total_files} TFRecord files in total.")
+    print(f"Checked {len(tfrecord_files)} TFRecord files in total.")
     return corrupted_files
 
 def generate_download_script(corrupted_files, output_script="download_corrupted_files.sh"):
