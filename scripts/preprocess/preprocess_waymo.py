@@ -43,36 +43,33 @@ class WaymoSequencePreprocessor:
             print(f"{Fore.RED}DataLossError: {filename} is corrupted. Skipping...{Style.RESET_ALL}")
             return
 
-    def resize_image_and_labels(self, image_data, bboxes):
+    def resize_image_and_labels(self, image, bboxes):
         """
-        画像をリサイズし、対応するバウンディングボックスもスケールします。
+        アスペクト比を維持しつつ画像をリサイズし、パディングを行いません。
+        バウンディングボックスの座標はスケーリングします。
 
         Args:
-            image_data (bytes): 元画像データ。
-            bboxes (list): バウンディングボックス情報のリスト。
+            image (np.ndarray): 元の画像。
+            bboxes (list): 元のバウンディングボックス。
 
         Returns:
-            tuple: リサイズ後の画像データ、スケールされたバウンディングボックス。
+            np.ndarray: リサイズ後の画像。
+            list: リサイズ後のバウンディングボックス。
         """
-        # OpenCVで画像をデコード
-        np_array = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+        original_height, original_width = image.shape[:2]
+        target_size = self.image_size
 
-        # 元の幅と高さを取得
-        original_height, original_width = img.shape[:2]
-
-        # 長辺を target_size にスケール
-        scale = self.target_size / max(original_width, original_height)
+        # アスペクト比を維持してリサイズ
+        scale = min(target_size / original_width, target_size / original_height)
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
 
-        # 画像をリサイズ
-        resized_img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        resized_image = cv2.resize(image, (new_width, new_height))
 
-        # バウンディングボックスをスケール
-        scaled_bboxes = []
+        # バウンディングボックスのスケーリング
+        resized_bboxes = []
         for bbox in bboxes:
-            scaled_bboxes.append({
+            resized_bboxes.append({
                 "center_x": bbox["center_x"] * scale,
                 "center_y": bbox["center_y"] * scale,
                 "length": bbox["length"] * scale,
@@ -80,10 +77,8 @@ class WaymoSequencePreprocessor:
                 "class": bbox["class"]
             })
 
-        # リサイズ後の画像をエンコードしてバイトデータに変換
-        _, encoded_img = cv2.imencode('.jpg', resized_img)
+        return resized_image, resized_bboxes
 
-        return encoded_img.tobytes(), scaled_bboxes
 
     def preprocess(self, input_dir, output_dir):
         """
