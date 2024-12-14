@@ -1,37 +1,36 @@
 import argparse
 import tensorflow as tf
 import os
-import json
+import cv2
+import numpy as np
 from waymo_open_dataset import dataset_pb2 as open_dataset
 from colorama import Fore, Style
 from tqdm import tqdm
-import cv2
-import numpy as np
 
 MODE = {"training": "train", "testing": "test", "validation": "val"}
 
 class WaymoSequencePreprocessor:
-    def __init__(self, output_dir, target_size):
+    def __init__(self, output_dir, image_size):
         """
-        初期化: 出力ディレクトリとターゲットサイズを設定します。
+        初期化: 出力ディレクトリと画像サイズを設定します。
 
         Args:
             output_dir (str): 抽出データを保存するディレクトリ。
-            target_size (int): リサイズ後の長辺のサイズ。
+            image_size (int): 出力画像のサイズ（正方形）。
         """
         self.output_dir = output_dir
-        self.target_size = target_size
+        self.image_size = image_size
         os.makedirs(output_dir, exist_ok=True)
 
     def parse_tfrecord(self, filename):
         """
-        TFRecordをパースしてフレームデータを生成します。
+        TFRecordファイルをパースしてフレームごとにデータを生成します。
 
         Args:
             filename (str): TFRecordファイルのパス。
 
         Yields:
-            frame (open_dataset.Frame): Waymo Frameデータ。
+            open_dataset.Frame: パースされたフレームオブジェクト。
         """
         try:
             dataset = tf.data.TFRecordDataset(filename, compression_type='')
@@ -43,7 +42,7 @@ class WaymoSequencePreprocessor:
             print(f"{Fore.RED}DataLossError: {filename} is corrupted. Skipping...{Style.RESET_ALL}")
             return
 
-    def resize_image_and_labels(self, image, bboxes):
+    def resize_image_without_padding(self, image, bboxes):
         """
         アスペクト比を維持しつつ画像をリサイズし、パディングを行いません。
         バウンディングボックスの座標はスケーリングします。
@@ -79,19 +78,17 @@ class WaymoSequencePreprocessor:
 
         return resized_image, resized_bboxes
 
-
-    def preprocess(self, input_dir, output_dir):
+    def preprocess_to_tfrecord(self, input_dir, output_dir):
         """
-        入力ディレクトリ内のすべてのTFRecordファイルを処理します。
+        入力ディレクトリ内のTFRecordをフィルタリングし、新しいTFRecordに変換して保存します。
 
         Args:
             input_dir (str): TFRecordファイルが格納されたディレクトリ。
-            output_dir (str): 処理後のデータを保存するディレクトリ。
+            output_dir (str): フィルタリング後のTFRecordを保存するディレクトリ。
         """
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-        # train, test, validationの各ディレクトリを検出
         subsets = ['training', 'testing', 'validation']
         for subset in subsets:
             subset_input_dir = os.path.join(input_dir, subset)
@@ -107,92 +104,84 @@ class WaymoSequencePreprocessor:
             ]
 
             for filename in tqdm(tfrecord_files, desc=f"Processing {subset} sequences"):
-                # ファイル名からIDを抽出
                 base_name = os.path.basename(filename)
                 sequence_id = base_name.split('_')[0].replace('segment-', '')
 
                 print(f"Processing sequence {sequence_id} in {subset}: {filename}")
 
-                # シーケンス用ディレクトリを作成
-                sequence_dir = os.path.join(subset_output_dir, sequence_id)
-                os.makedirs(sequence_dir, exist_ok=True)
+                sequence_output_path = os.path.join(subset_output_dir, f"{sequence_id}.tfrecord")
+                with tf.io.TFRecordWriter(sequence_output_path) as writer:
+                    for frame_idx, frame in enumerate(self.parse_tfrecord(filename)):
+                        frame_id = f"frame_{frame_idx:04d}"
+                        for camera_image in frame.images:
+                            camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
+                            bboxes = []
+                            for camera_labels in frame.camera_labels:
+                                if camera_labels.name != camera_image.name:
+                                    continue
+                                for label in camera_labels.labels:
+                                    bboxes.append({
+                                        "center_x": label.box.center_x,
+                                        "center_y": label.box.center_y,
+                                        "length": label.box.length,
+                                        "width": label.box.width,
+                                        "class": getattr(label, "type", -1)
+                                    })
 
-                camera_annotations = {  # カメラごとのアノテーションを格納
-                    "FRONT": [],
-                    "FRONT_LEFT": [],
-                    "SIDE_LEFT": [],
-                    "FRONT_RIGHT": [],
-                    "SIDE_RIGHT": []
-                }
+                            # 画像リサイズ（パディングなし）
+                            image_np = np.frombuffer(camera_image.image, dtype=np.uint8)
+                            decoded_image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+                            resized_image, resized_bboxes = self.resize_image_without_padding(decoded_image, bboxes)
 
-                # フレームごとに処理
-                for frame_idx, frame in enumerate(self.parse_tfrecord(filename)):
-                    frame_id = f"frame_{frame_idx:04d}"
-                    for camera_image in frame.images:
-                        camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
+                            # TFRecordにシリアライズして保存
+                            _, buffer = cv2.imencode('.jpg', resized_image)
+                            example = self.serialize_example(
+                                image_bytes=buffer.tobytes(),
+                                camera_name=camera_name,
+                                frame_id=frame_id,
+                                bboxes=resized_bboxes
+                            )
+                            writer.write(example.SerializeToString())
 
-                        if camera_name not in camera_annotations.keys():
-                            continue
+    def serialize_example(self, image_bytes, camera_name, frame_id, bboxes):
+        """
+        データを新しいTFRecord形式にシリアライズします。
 
-                        # バウンディングボックスを収集
-                        bboxes = []
-                        for camera_labels in frame.camera_labels:
-                            if camera_labels.name != camera_image.name:
-                                continue
-                            for label in camera_labels.labels:
-                                bboxes.append({
-                                    "center_x": label.box.center_x,
-                                    "center_y": label.box.center_y,
-                                    "length": label.box.length,
-                                    "width": label.box.width,
-                                    "class": getattr(label, "type", -1)  # クラス情報
-                                })
+        Args:
+            image_bytes (bytes): 画像データ。
+            camera_name (str): カメラの名前。
+            frame_id (str): フレームID。
+            bboxes (list): バウンディングボックスの情報。
 
-                        # 画像とラベルをリサイズ
-                        resized_image, scaled_bboxes = self.resize_image_and_labels(
-                            camera_image.image, bboxes
-                        )
+        Returns:
+            tf.train.Example: シリアライズされたExample。
+        """
+        # バウンディングボックス情報を配列形式で保存
+        bbox_data = []
+        for bbox in bboxes:
+            bbox_data.extend([bbox["center_x"], bbox["center_y"], bbox["length"], bbox["width"], bbox["class"]])
 
-                        # カメラごとのディレクトリを作成
-                        camera_dir = os.path.join(sequence_dir, "images", camera_name)
-                        os.makedirs(camera_dir, exist_ok=True)
+        feature = {
+            "image": tf.train.Feature(bytes_list=tf.train.BytesList(value=[image_bytes])),
+            "camera_name": tf.train.Feature(bytes_list=tf.train.BytesList(value=[camera_name.encode('utf-8')])),
+            "frame_id": tf.train.Feature(bytes_list=tf.train.BytesList(value=[frame_id.encode('utf-8')])),
+            "bboxes": tf.train.Feature(float_list=tf.train.FloatList(value=bbox_data))
+        }
 
-                        # リサイズ画像を保存
-                        image_path = os.path.join(camera_dir, f"{frame_id}.jpg")
-                        with open(image_path, "wb") as img_file:
-                            img_file.write(resized_image)
-
-                        # スケールされたバウンディングボックスを保存
-                        camera_annotations[camera_name].append({
-                            "frame_id": frame_id,
-                            "camera_name": camera_name,
-                            "image_path": image_path,
-                            "bboxes": scaled_bboxes
-                        })
-
-                # カメラごとのアノテーションを保存
-                for camera_name, annotations in camera_annotations.items():
-                    camera_anno_path = os.path.join(sequence_dir, "annotations", camera_name)
-                    os.makedirs(camera_anno_path, exist_ok=True)
-                    anno_file_path = os.path.join(camera_anno_path, "annotations.json")
-                    with open(anno_file_path, "w") as anno_file:
-                        json.dump(annotations, anno_file, indent=4)
+        return tf.train.Example(features=tf.train.Features(feature=feature))
 
 
 if __name__ == "__main__":
-    # コマンドライン引数の処理
-    parser = argparse.ArgumentParser(description="Waymo TFRecord Preprocessor with Resizing")
+    parser = argparse.ArgumentParser(description="Waymo TFRecord Preprocessor")
     parser.add_argument("-i", "--input", required=True, help="Input directory containing TFRecord files")
     parser.add_argument("-o", "--output", required=True, help="Output directory to save processed data")
-    parser.add_argument("-n", "--size", type=int, required=True, help="Target size for the longer edge of images")
+    parser.add_argument("-s", "--size", type=int, required=True, help="Output image size (square)")
 
     args = parser.parse_args()
 
-    # 入力と出力ディレクトリ、リサイズターゲットサイズの指定
     input_dir = args.input
     output_dir = args.output
-    target_size = args.size
+    image_size = args.size
 
-    # 前処理実行
-    preprocessor = WaymoSequencePreprocessor(output_dir, target_size)
-    preprocessor.preprocess(input_dir, output_dir)
+    preprocessor = WaymoSequencePreprocessor(output_dir, image_size)
+    preprocessor.preprocess_to_tfrecord(input_dir, output_dir)
