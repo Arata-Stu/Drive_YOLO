@@ -24,6 +24,15 @@ class WaymoSequencePreprocessor:
         os.makedirs(output_dir, exist_ok=True)
 
     def parse_tfrecord(self, filename):
+        """
+        TFRecordをパースしてフレームデータを生成します。
+
+        Args:
+            filename (str): TFRecordファイルのパス。
+
+        Yields:
+            frame (open_dataset.Frame): Waymo Frameデータ。
+        """
         try:
             dataset = tf.data.TFRecordDataset(filename, compression_type='')
             for data in dataset:
@@ -34,15 +43,16 @@ class WaymoSequencePreprocessor:
             print(f"{Fore.RED}DataLossError: {filename} is corrupted. Skipping...{Style.RESET_ALL}")
             return
 
-    def resize_image(self, image_data):
+    def resize_image_and_labels(self, image_data, bboxes):
         """
-        OpenCV を使用して画像をリサイズします。
+        画像をリサイズし、対応するバウンディングボックスもスケールします。
 
         Args:
             image_data (bytes): 元画像データ。
+            bboxes (list): バウンディングボックス情報のリスト。
 
         Returns:
-            bytes: リサイズ後の画像データ（JPEG形式）。
+            tuple: リサイズ後の画像データ、スケールされたバウンディングボックス。
         """
         # OpenCVで画像をデコード
         np_array = np.frombuffer(image_data, np.uint8)
@@ -56,12 +66,24 @@ class WaymoSequencePreprocessor:
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
 
-        # リサイズ
+        # 画像をリサイズ
         resized_img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
-        # 再エンコードしてバイトデータに戻す
+        # バウンディングボックスをスケール
+        scaled_bboxes = []
+        for bbox in bboxes:
+            scaled_bboxes.append({
+                "center_x": bbox["center_x"] * scale,
+                "center_y": bbox["center_y"] * scale,
+                "length": bbox["length"] * scale,
+                "width": bbox["width"] * scale,
+                "class": bbox["class"]
+            })
+
+        # リサイズ後の画像をエンコードしてバイトデータに変換
         _, encoded_img = cv2.imencode('.jpg', resized_img)
-        return encoded_img.tobytes()
+
+        return encoded_img.tobytes(), scaled_bboxes
 
     def preprocess(self, input_dir, output_dir):
         """
@@ -117,16 +139,6 @@ class WaymoSequencePreprocessor:
                         if camera_name not in camera_annotations.keys():
                             continue
 
-                        # カメラごとのディレクトリを作成
-                        camera_dir = os.path.join(sequence_dir, "images", camera_name)
-                        os.makedirs(camera_dir, exist_ok=True)
-
-                        # リサイズ画像を保存
-                        resized_image = self.resize_image(camera_image.image)
-                        image_path = os.path.join(camera_dir, f"{frame_id}.jpg")
-                        with open(image_path, "wb") as img_file:
-                            img_file.write(resized_image)
-
                         # バウンディングボックスを収集
                         bboxes = []
                         for camera_labels in frame.camera_labels:
@@ -141,12 +153,26 @@ class WaymoSequencePreprocessor:
                                     "class": getattr(label, "type", -1)  # クラス情報
                                 })
 
-                        # フレームアノテーションを保存
+                        # 画像とラベルをリサイズ
+                        resized_image, scaled_bboxes = self.resize_image_and_labels(
+                            camera_image.image, bboxes
+                        )
+
+                        # カメラごとのディレクトリを作成
+                        camera_dir = os.path.join(sequence_dir, "images", camera_name)
+                        os.makedirs(camera_dir, exist_ok=True)
+
+                        # リサイズ画像を保存
+                        image_path = os.path.join(camera_dir, f"{frame_id}.jpg")
+                        with open(image_path, "wb") as img_file:
+                            img_file.write(resized_image)
+
+                        # スケールされたバウンディングボックスを保存
                         camera_annotations[camera_name].append({
                             "frame_id": frame_id,
                             "camera_name": camera_name,
                             "image_path": image_path,
-                            "bboxes": bboxes
+                            "bboxes": scaled_bboxes
                         })
 
                 # カメラごとのアノテーションを保存
@@ -160,7 +186,7 @@ class WaymoSequencePreprocessor:
 
 if __name__ == "__main__":
     # コマンドライン引数の処理
-    parser = argparse.ArgumentParser(description="Waymo TFRecord Preprocessor with OpenCV Resizing")
+    parser = argparse.ArgumentParser(description="Waymo TFRecord Preprocessor with Resizing")
     parser.add_argument("-i", "--input", required=True, help="Input directory containing TFRecord files")
     parser.add_argument("-o", "--output", required=True, help="Output directory to save processed data")
     parser.add_argument("-n", "--size", type=int, required=True, help="Target size for the longer edge of images")
