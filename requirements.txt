@@ -2,6 +2,8 @@ omegaconf
 colorama
 tqdm
 loguru
+h5py
+hdf5plugin
 
 scipy
 opencv-python

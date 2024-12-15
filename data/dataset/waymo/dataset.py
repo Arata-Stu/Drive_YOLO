@@ -1,42 +1,39 @@
 import os
+import h5py
+import torch
 from torch.utils.data import ConcatDataset
-from typing import Callable
+from typing import Callable, List
 
 from .sequence_dataset import WaymoSequenceDataset
 
-class WaymoDataset:
-    def __init__(self, root_dir, mode: str = 'train', transform: Callable = None):
+
+class WaymoConcatDataset(ConcatDataset):
+    def __init__(self, root_dir: str, mode: str, transform: Callable = None, cameras: List[str] = None):
         """
-        全シーケンスを統合したデータセットを初期化します。
+        WaymoConcatDatasetクラス（複数のWaymoSequenceDatasetを結合）
 
         Args:
-            root_dir (str): 前処理済みデータのルートディレクトリ。
-            mode (str): 使用するデータセットモード ('train', 'test', 'val')。
-            transform (Callable): 画像変換処理。
+            root_dir (str): データセットのルートディレクトリ。
+            mode (str): データのモード ("train", "val", "test")。
+            transform (Callable, optional): 画像に適用する前処理。
+            cameras (list, optional): 使用するカメラリスト。
         """
-        assert root_dir is not None, "root_dir must be specified."
-        assert mode in ['train', 'test', 'val'], f"Invalid mode: {mode}"
-
         self.root_dir = root_dir
         self.mode = mode
         self.transform = transform
+        self.cameras = cameras
 
+        # モードに応じたディレクトリを探索
         mode_dir = os.path.join(root_dir, mode)
         if not os.path.exists(mode_dir):
-            raise FileNotFoundError(f"Directory for mode '{mode}' not found: {mode_dir}")
+            raise FileNotFoundError(f"ディレクトリ {mode_dir} が存在しません。")
 
-        # シーケンス単位のデータセットを構築
-        self.datasets = []
-        for sequence_id in os.listdir(mode_dir):
-            sequence_dir = os.path.join(mode_dir, sequence_id)
-            if os.path.isdir(sequence_dir):
-                self.datasets.append(WaymoSequenceDataset(sequence_dir, mode, transform))
+        # 各HDF5ファイルのデータセットを作成
+        sequence_datasets = []
+        for h5_file in sorted(os.listdir(mode_dir)):
+            if h5_file.endswith(".h5"):
+                h5_path = os.path.join(mode_dir, h5_file)
+                sequence_datasets.append(WaymoSequenceDataset(h5_path=h5_path, transform=transform, cameras=cameras))
 
-        # シーケンス単位のデータセットを統合
-        self.dataset = ConcatDataset(self.datasets)
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        return self.dataset[idx]
+        # ConcatDatasetを初期化
+        super().__init__(sequence_datasets)
