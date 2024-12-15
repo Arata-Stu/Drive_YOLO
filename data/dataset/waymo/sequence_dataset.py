@@ -3,7 +3,7 @@ import torch
 import h5py
 from torch.utils.data import Dataset
 from typing import Callable
-
+import os
 
 class WaymoSequenceDataset(Dataset):
     def __init__(self, h5_path: str, transform: Callable = None):
@@ -17,6 +17,9 @@ class WaymoSequenceDataset(Dataset):
         self.h5_path = h5_path
         self.transform = transform
         self.data_indices = []
+
+        # HDF5ファイル名からユニークな数字部分を取得
+        self.file_id = int(os.path.splitext(os.path.basename(h5_path))[0])
 
         # フレームとカメラデータを収集
         with h5py.File(h5_path, "r") as h5_file:
@@ -47,10 +50,15 @@ class WaymoSequenceDataset(Dataset):
 
             bboxes = torch.from_numpy(bboxes).float()
 
+            # frame_idの数値部分を抽出 (_ で区切って数字部分を取得)
+            frame_number = int(frame_id.split("_")[-1])  # 'frame_001' -> 1
+            unique_id = self.file_id + frame_number
+
             outputs = {
                 "images": image,
                 "labels": bboxes,
-                "frame_id": frame_id
+                "frame_id": frame_id,
+                "unique_id": unique_id
             }
 
             # 前処理
@@ -58,3 +66,4 @@ class WaymoSequenceDataset(Dataset):
                 outputs = self.transform(outputs)
 
         return outputs
+
