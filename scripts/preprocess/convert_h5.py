@@ -36,11 +36,11 @@ class TFRecordToH5Converter:
         example = tf.io.parse_single_example(serialized_example, feature_description)
 
         # データの復元
-        image = tf.image.decode_jpeg(example["image"])
+        image = example["image"].numpy()  # 圧縮されたJPEGのまま取得
         bboxes = tf.sparse.to_dense(example["bboxes"])
         bboxes = tf.reshape(bboxes, [-1, 5])  # [center_x, center_y, length, width, class]
         return {
-            "image": image.numpy(),
+            "image": image,  # JPEG形式のまま返す
             "bboxes": bboxes.numpy(),
         }
 
@@ -57,20 +57,35 @@ class TFRecordToH5Converter:
         tfrecord_file, output_subdir = args
         sequence_id = os.path.basename(tfrecord_file).split(".")[0]
         output_path = os.path.join(output_subdir, f"{sequence_id}.h5")
+        temp_output_path = output_path + ".tmp"
 
-        # HDF5に変換
-        with h5py.File(output_path, "w") as h5_file:
-            dataset = tf.data.TFRecordDataset(tfrecord_file)
-            for idx, raw_record in enumerate(dataset):
-                data = self.parse_tfrecord(raw_record.numpy())
-                frame_id = f"frame_{idx:04d}"
+        # すでに処理済みの場合はスキップ
+        if os.path.exists(output_path):
+            print(f"既存のHDF5ファイルが見つかりました。スキップします: {output_path}")
+            return
 
-                # フレームごとに保存
-                frame_group = h5_file.create_group(frame_id)
-                frame_group.create_dataset("image", data=data["image"], compression="gzip")
-                frame_group.create_dataset("bboxes", data=data["bboxes"], compression="gzip")
+        try:
+            # 一時ファイルに書き込み
+            with h5py.File(temp_output_path, "w") as h5_file:
+                dataset = tf.data.TFRecordDataset(tfrecord_file)
+                for idx, raw_record in enumerate(dataset):
+                    data = self.parse_tfrecord(raw_record.numpy())
+                    frame_id = f"frame_{idx:04d}"
 
-        print(f"HDF5ファイルを保存しました: {output_path}")
+                    # フレームごとに保存
+                    frame_group = h5_file.create_group(frame_id)
+                    frame_group.create_dataset("image", data=data["image"], compression="gzip")  # JPEGのまま保存
+                    frame_group.create_dataset("bboxes", data=data["bboxes"], compression="gzip")
+
+            # 書き込み完了後にリネーム
+            os.rename(temp_output_path, output_path)
+            print(f"HDF5ファイルを保存しました: {output_path}")
+
+        except Exception as e:
+            # エラー発生時に一時ファイルを削除
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+            print(f"エラーが発生しました ({tfrecord_file}): {e}")
 
     def convert_to_h5(self, num_workers):
         """

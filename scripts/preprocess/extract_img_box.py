@@ -107,41 +107,66 @@ class WaymoSequencePreprocessor:
                 base_name = os.path.basename(filename)
                 sequence_id = base_name.split('_')[0].replace('segment-', '')
 
+                # 正式な出力ファイルと一時ファイルのパス
+                sequence_output_path = os.path.join(subset_output_dir, f"{sequence_id}.tfrecord")
+                temp_output_path = sequence_output_path + ".tmp"
+
+                # 再開機能: 正式ファイルが存在する場合はスキップ
+                if os.path.exists(sequence_output_path):
+                    print(f"Skipping already processed file: {sequence_output_path}")
+                    continue
+
+                # 再開時: 途中ファイルが存在する場合は削除
+                if os.path.exists(temp_output_path):
+                    print(f"Removing incomplete temporary file: {temp_output_path}")
+                    os.remove(temp_output_path)
+
                 print(f"Processing sequence {sequence_id} in {subset}: {filename}")
 
-                sequence_output_path = os.path.join(subset_output_dir, f"{sequence_id}.tfrecord")
-                with tf.io.TFRecordWriter(sequence_output_path) as writer:
-                    for frame_idx, frame in enumerate(self.parse_tfrecord(filename)):
-                        frame_id = f"frame_{frame_idx:04d}"
-                        for camera_image in frame.images:
-                            camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
-                            bboxes = []
-                            for camera_labels in frame.camera_labels:
-                                if camera_labels.name != camera_image.name:
-                                    continue
-                                for label in camera_labels.labels:
-                                    bboxes.append({
-                                        "center_x": label.box.center_x,
-                                        "center_y": label.box.center_y,
-                                        "length": label.box.length,
-                                        "width": label.box.width,
-                                        "class": getattr(label, "type", -1)
-                                    })
+                try:
+                    with tf.io.TFRecordWriter(temp_output_path) as writer:
+                        for frame_idx, frame in enumerate(self.parse_tfrecord(filename)):
+                            frame_id = f"frame_{frame_idx:04d}"
+                            for camera_image in frame.images:
+                                camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
+                                bboxes = []
+                                for camera_labels in frame.camera_labels:
+                                    if camera_labels.name != camera_image.name:
+                                        continue
+                                    for label in camera_labels.labels:
+                                        bboxes.append({
+                                            "center_x": label.box.center_x,
+                                            "center_y": label.box.center_y,
+                                            "length": label.box.length,
+                                            "width": label.box.width,
+                                            "class": getattr(label, "type", -1)
+                                        })
 
-                            # 画像リサイズ（パディングなし）
-                            image_np = np.frombuffer(camera_image.image, dtype=np.uint8)
-                            decoded_image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-                            resized_image, resized_bboxes = self.resize_image_without_padding(decoded_image, bboxes)
+                                # 画像リサイズ（パディングなし）
+                                image_np = np.frombuffer(camera_image.image, dtype=np.uint8)
+                                decoded_image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+                                resized_image, resized_bboxes = self.resize_image_without_padding(decoded_image, bboxes)
 
-                            # TFRecordにシリアライズして保存
-                            _, buffer = cv2.imencode('.jpg', resized_image)
-                            example = self.serialize_example(
-                                image_bytes=buffer.tobytes(),
-                                camera_name=camera_name,
-                                frame_id=frame_id,
-                                bboxes=resized_bboxes
-                            )
-                            writer.write(example.SerializeToString())
+                                # TFRecordにシリアライズして保存
+                                _, buffer = cv2.imencode('.jpg', resized_image)
+                                example = self.serialize_example(
+                                    image_bytes=buffer.tobytes(),
+                                    camera_name=camera_name,
+                                    frame_id=frame_id,
+                                    bboxes=resized_bboxes
+                                )
+                                writer.write(example.SerializeToString())
+
+                    # 処理完了後に一時ファイルをリネーム
+                    os.rename(temp_output_path, sequence_output_path)
+                    print(f"Successfully saved: {sequence_output_path}")
+
+                except Exception as e:
+                    # エラー発生時に一時ファイルを削除
+                    if os.path.exists(temp_output_path):
+                        os.remove(temp_output_path)
+                    print(f"Error processing {filename}: {e}")
+
 
     def serialize_example(self, image_bytes, camera_name, frame_id, bboxes):
         """
