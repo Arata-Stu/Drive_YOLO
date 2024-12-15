@@ -1,7 +1,7 @@
 from omegaconf import DictConfig
 from torchvision import transforms
 
-from ..data_utils.transform import ImagePad, LabelPad, RandomRotate, Flip
+from ..data_utils.transform import ImagePad, LabelPad, RandomRotate, Flip, YOLOXTransform
 from .waymo.build_dataset import build_waymo_dataset
 from .waymo.data_info import ORIG_CLASS, MY_CLASS
 
