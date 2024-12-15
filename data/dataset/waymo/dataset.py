@@ -33,7 +33,7 @@ class WaymoConcatDataset(ConcatDataset):
         for h5_file in sorted(os.listdir(mode_dir)):
             if h5_file.endswith(".h5"):
                 h5_path = os.path.join(mode_dir, h5_file)
-                sequence_datasets.append(WaymoSequenceDataset(h5_path=h5_path, transform=transform, cameras=cameras))
+                sequence_datasets.append(WaymoSequenceDataset(h5_path=h5_path, transform=transform))
 
         # ConcatDatasetを初期化
         super().__init__(sequence_datasets)

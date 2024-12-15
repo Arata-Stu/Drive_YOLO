@@ -37,7 +37,7 @@ def visualize_sequence_from_dataset(dataset, frame_indices: list, mode='train', 
 
     for i, idx in enumerate(frame_indices):
         data = dataset[idx]
-        events = data['image']  # (ch, h, w)
+        events = data['images']  # (ch, h, w)
         labels = data['labels']
         
         # フレーム変換と描画

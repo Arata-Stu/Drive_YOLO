@@ -1,63 +1,60 @@
-import os
-import h5py
+import numpy as np
 import torch
+import h5py
 from torch.utils.data import Dataset
-from typing import Callable, List
+from typing import Callable
 
 
 class WaymoSequenceDataset(Dataset):
-    def __init__(self, h5_path: str, transform: Callable = None, cameras: List[str] = None):
+    def __init__(self, h5_path: str, transform: Callable = None):
         """
-        Waymoシーケンスデータセットクラス（1つのHDF5ファイルを管理）
+        Waymoシーケンスデータセットクラス。
 
         Args:
             h5_path (str): HDF5ファイルのパス。
             transform (Callable, optional): 画像に適用する前処理。
-            cameras (list, optional): 使用するカメラリスト（例: ["FRONT", "FRONT_LEFT"]）。
         """
         self.h5_path = h5_path
         self.transform = transform
         self.data_indices = []
 
-        # HDF5ファイルを読み込み、フレームとカメラの情報を収集
+        # フレームとカメラデータを収集
         with h5py.File(h5_path, "r") as h5_file:
-            frames = list(h5_file.keys())
-            if cameras is None:
-                cameras = list(h5_file[frames[0]].keys())  # 全カメラを自動検出
-            self.data_indices.extend([(frame, camera) for frame in frames for camera in cameras])
+            self.frames = list(h5_file.keys())
+            for frame in self.frames:
+                self.data_indices.append(frame)
 
     def __len__(self):
-        """データセットのサイズを返します。"""
         return len(self.data_indices)
 
     def __getitem__(self, idx):
-        """
-        指定されたインデックスのデータを取得します。
-
-        Args:
-            idx (int): データセット内のインデックス。
-
-        Returns:
-            dict: 指定カメラの画像とバウンディングボックスデータ。
-        """
-        frame, camera = self.data_indices[idx]
+        frame_id = self.data_indices[idx]
 
         with h5py.File(self.h5_path, "r") as h5_file:
-            camera_data = h5_file[frame][camera]
-            image = camera_data["image"][:]
-            bboxes = camera_data["bboxes"][:]
+            frame_data = h5_file[frame_id]
 
-        # 画像をTensorに変換し、前処理を適用
-        image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0  # HWC -> CHW
-        if self.transform:
-            image = self.transform(image)
+            # 画像データ
+            image = frame_data["image"][:]
+            image = torch.from_numpy(image).permute(2, 0, 1).float()
 
-        # バウンディングボックスをTensorに変換
-        bboxes = torch.from_numpy(bboxes).float()
+            # バウンディングボックスデータ
+            bboxes = frame_data["bboxes"][:]
+            if bboxes.size == 0:  # バウンディングボックスがない場合
+                bboxes = np.zeros((0, 5), dtype=np.float32)
+            else:
+                # 形式変換: cx, cy, w, h, cls -> cls, cx, cy, w, h
+                bboxes = np.hstack((bboxes[:, -1:], bboxes[:, :-1])).astype(np.float32)
 
-        return {
-            "image": image,
-            "bboxes": bboxes,
-            "camera": camera,
-            "frame_id": frame,
-        }
+            bboxes = torch.from_numpy(bboxes).float()
+
+            outputs = {
+                "images": image,
+                "labels": bboxes,
+                "frame_id": frame_id
+            }
+
+            # 前処理
+            if self.transform:
+                outputs = self.transform(outputs)
+
+        return outputs

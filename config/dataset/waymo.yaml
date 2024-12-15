@@ -1,6 +1,6 @@
 dataset:
   name: waymo
-  data_dir: ${oc.env:PROJECT_ROOT, .}/datasets/processed_waymo/
+  data_dir: ${oc.env:PROJECT_ROOT, .}/datasets/h5_waymo/
   
   augmentation:
       prob_hflip: 0.5
