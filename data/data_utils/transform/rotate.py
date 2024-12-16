@@ -75,7 +75,7 @@ class Rotate:
         _, H, W = image.shape
 
         # 画像を回転（PyTorchの機能）
-        rotated_image = F.rotate(image, self.angle)
+        rotated_image = F.rotate(image, self.angle, fill=(114,114,114))
 
         # ラベルを回転
         rotated_labels = self.rotate_bboxes(labels, self.angle, W, H)
