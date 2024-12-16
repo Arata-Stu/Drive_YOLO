@@ -1,26 +1,24 @@
+import time
 import cv2
 import numpy as np
 from typing import Tuple
 
 class Resize:
-    def __init__(self, target_size: Tuple[int, int], mode: str = "bilinear"):
+    def __init__(self, target_size: Tuple[int, int], mode: str = "bilinear", timing: bool = False):
         """
         Args:
             target_size: (height, width)
             mode: 'bilinear', 'nearest', 'bicubic', 'area'
+            timing: 処理時間を計測するかどうか
         """
         self.target_size = target_size
         self.mode = mode
+        self.timing = timing
 
     def __call__(self, inputs: dict) -> dict:
-        """
-        Args:
-            inputs: dict
-                "images": ndarray [C, H, W]
-                "labels": ndarray [N, 5] (5: cls, cx, cy, w, h)
-        Returns:
-            dict with resized "images" and updated "labels"
-        """
+        if self.timing:
+            start_time = time.time()
+
         img = inputs.get("images")
         labels = inputs.get("labels")
 
@@ -68,4 +66,9 @@ class Resize:
         # Update inputs dictionary
         inputs["images"] = resized_img
         inputs["labels"] = labels
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"Resize processing time: {elapsed_time:.6f} seconds")
+
         return inputs

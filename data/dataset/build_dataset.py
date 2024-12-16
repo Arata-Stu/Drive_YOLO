@@ -8,14 +8,15 @@ from .waymo.data_info import ORIG_CLASS, MY_CLASS
 def build_dataset(dataset_config: DictConfig, mode: str = 'train'):
 
     name = dataset_config.name
+    use_time = dataset_config.transform_timer
     target_size = (640, 640)
 
-    img_pad = ImagePad(target_size=target_size, mode='constant' ,padding_value=114)
-    label_pad = LabelPad(max_num_labels=150)
-    label_filter = LabelFilter(orig_class=ORIG_CLASS, my_class=MY_CLASS)
-    rotate = RandomRotate(min_angle=-6, max_angle=6)
-    horizontal_flip = Flip(vertical=False, horizontal=True)
-    yolo_box_transform = BoxFormatTransform(mode=mode)
+    img_pad = ImagePad(target_size=target_size, mode='constant' ,padding_value=114, timing=use_time)
+    label_pad = LabelPad(max_num_labels=150, timing=use_time)
+    label_filter = LabelFilter(orig_class=ORIG_CLASS, my_class=MY_CLASS, timing=use_time)
+    rotate = RandomRotate(min_angle=-6, max_angle=6, timing=use_time)
+    horizontal_flip = Flip(vertical=False, horizontal=True, timing=use_time)
+    yolo_box_transform = BoxFormatTransform(mode=mode, timing=use_time)
 
     if mode == 'train':
         _transform = [img_pad, label_filter, horizontal_flip, rotate, yolo_box_transform, label_pad]

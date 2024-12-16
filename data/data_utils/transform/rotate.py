@@ -1,62 +1,59 @@
+import time
 import cv2
 import numpy as np
 import math
 import random
 
 class RandomRotate:
-    def __init__(self, min_angle: float = -10.0, max_angle: float = 10.0):
+    def __init__(self, min_angle: float = -10.0, max_angle: float = 10.0, timing: bool = False):
         """
         Args:
             min_angle (float):
                 ランダムに選択する角度の最小値（度単位）。
             max_angle (float):
                 ランダムに選択する角度の最大値（度単位）。
+            timing (bool): 処理時間を計測するかどうか
         """
         if min_angle > max_angle:
             raise ValueError("min_angle should be less than or equal to max_angle.")
         self.min_angle = min_angle
         self.max_angle = max_angle
+        self.timing = timing
 
     def __call__(self, inputs: dict) -> dict:
-        """
-        Args:
-            inputs: dict
-                - "images": ndarray of shape [C, H, W]
-                - "labels": ndarray of shape [N, 5] (format: [cls, cx, cy, w, h])
+        if self.timing:
+            start_time = time.time()
 
-        Returns:
-            dict:
-                ランダムな角度で回転後の画像と対応するバウンディングボックスを含む辞書。
-        """
         # ランダムな角度を選択
         random_angle = random.uniform(self.min_angle, self.max_angle)
 
         # Rotateクラスを利用して回転処理
         rotate = Rotate(angle=random_angle)
-        return rotate(inputs)
+        result = rotate(inputs)
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"RandomRotate processing time: {elapsed_time:.6f} seconds")
+
+        return result
 
 
 class Rotate:
-    def __init__(self, angle: float = 0.0):
+    def __init__(self, angle: float = 0.0, timing: bool = False):
         """
         Args:
             angle (float):
                 画像を回転させる角度（度単位）。
                 正の値で反時計回り、負の値で時計回り。
+            timing (bool): 処理時間を計測するかどうか
         """
         self.angle = angle
+        self.timing = timing
 
     def __call__(self, inputs: dict) -> dict:
-        """
-        Args:
-            inputs: dict
-                - "images": ndarray of shape [C, H, W]
-                - "labels": ndarray of shape [N, 5] (format: [cls, cx, cy, w, h])
+        if self.timing:
+            start_time = time.time()
 
-        Returns:
-            dict:
-                回転後の画像と対応するバウンディングボックスを含む辞書。
-        """
         image = inputs.get("images")
         labels = inputs.get("labels")
 
@@ -88,6 +85,11 @@ class Rotate:
         # 更新した辞書を返す
         inputs["images"] = rotated_image
         inputs["labels"] = rotated_labels
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"Rotate processing time: {elapsed_time:.6f} seconds")
+
         return inputs
 
     def rotate_image(self, image: np.ndarray, angle: float) -> np.ndarray:

@@ -1,17 +1,22 @@
+import time
 import numpy as np
 
 class BoxFormatTransform:
-    def __init__(self, mode: str = "train"):
+    def __init__(self, mode: str = "train", timing: bool = False):
         self.mode = mode
+        self.timing = timing
 
-    def __call__(self, sample):
+    def __call__(self, inputs):
+        if self.timing:
+            start_time = time.time()
+
         if self.mode == "train":
             # trainモードでは何もしない
-            return sample
+            result = inputs
 
         elif self.mode in ["val", "test"]:
             # val/testモードではラベルを変換
-            labels = sample["labels"]
+            labels = inputs["labels"]
             transformed_labels = []
             for label in labels:
                 cls, cx, cy, w, h = label
@@ -21,12 +26,17 @@ class BoxFormatTransform:
                 transformed_labels.append([x, y, w, h, cls])
 
             # ラベルを更新
-            sample["labels"] = np.array(transformed_labels, dtype=np.float32)
+            inputs["labels"] = np.array(transformed_labels, dtype=np.float32)
+            
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"BoxFormatTransform processing time: {elapsed_time:.6f} seconds")
 
-        return sample
+        return inputs
+
 
 class LabelFilter:
-    def __init__(self, orig_class, my_class):
+    def __init__(self, orig_class, my_class, timing: bool = False):
         """
         特定のクラスをフィルタリングし、ラベルを整列するTransform。
 
@@ -38,6 +48,8 @@ class LabelFilter:
         self.my_class = my_class
         self.allowed_classes = [orig_class[name] for name in my_class.keys()]
         self.class_mapping = {orig_class[name]: my_class[name] for name in my_class.keys()}
+
+        self.timing = timing
 
     def __call__(self, inputs):
         """
@@ -52,6 +64,10 @@ class LabelFilter:
         Returns:
             dict: フィルタリング後のサンプル。
         """
+
+        if self.timing:
+            start_time = time.time()
+
         labels = inputs["labels"]
 
         if labels is not None and len(labels) > 0:
@@ -64,5 +80,9 @@ class LabelFilter:
                 filtered_labels[filtered_labels[:, 0] == old_class, 0] = new_class
 
             inputs["labels"] = filtered_labels
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"LabelFilter processing time: {elapsed_time:.6f} seconds")
 
         return inputs

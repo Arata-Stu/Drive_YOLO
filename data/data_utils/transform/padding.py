@@ -1,23 +1,25 @@
+import time
 import numpy as np
 from typing import Tuple
 
 class ImagePad:
-    def __init__(self, target_size: Tuple[int, int], mode: str = 'constant', padding_value: float = 0):
+    def __init__(self, target_size: Tuple[int, int], mode: str = 'constant', padding_value: float = 0, timing: bool = False):
         """
         Args:
             target_size: (height, width) - target size
             mode: 'constant', 'reflect', 'replicate', 'circular'
             padding_value: constant padding 用の値 ('constant' の場合)
+            timing: 処理時間を計測するかどうか
         """
         self.target_size = target_size
         self.mode = mode
         self.padding_value = padding_value
+        self.timing = timing
 
     def __call__(self, inputs):
-        """
-        inputs: dict
-            "images": NumPy ndarray [C, H, W]
-        """
+        if self.timing:
+            start_time = time.time()
+
         img = inputs["images"]
 
         if img is None:
@@ -53,31 +55,30 @@ class ImagePad:
 
         # パディング後の画像を更新
         inputs["images"] = padded_img
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"ImagePad processing time: {elapsed_time:.6f} seconds")
+
         return inputs
 
 
-
 class LabelPad:
-    def __init__(self, max_num_labels=50):
+    def __init__(self, max_num_labels=50, timing: bool = False):
         """
         バウンディングボックスの数を最大数にパディングするTransformを初期化。
 
         Args:
             max_num_labels (int): パディング後のバウンディングボックスの最大数。
+            timing (bool): 処理時間を計測するかどうか
         """
         self.max_num_labels = max_num_labels
+        self.timing = timing
 
     def __call__(self, inputs):
-        """
-        データローダーのサンプルにバウンディングボックスのパディングを適用。
+        if self.timing:
+            start_time = time.time()
 
-        Args:
-            sample (dict): 入力サンプル。
-                - "labels": バウンディングボックス情報 (ndarray)
-
-        Returns:
-            dict: パディングされたサンプル。
-        """
         labels = inputs["labels"]
 
         if not isinstance(labels, np.ndarray):
@@ -94,5 +95,9 @@ class LabelPad:
 
         # パディング後のラベルをサンプルにセット
         inputs["labels"] = padded_labels
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"LabelPad processing time: {elapsed_time:.6f} seconds")
 
         return inputs
