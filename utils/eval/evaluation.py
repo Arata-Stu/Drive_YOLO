@@ -12,7 +12,7 @@ def evaluate_list(result_boxes_list,
     assert camera in {'waymo'}
 
     if camera == 'waymo':
-        classes = ("unknown", "vehicle", "pedestrian", "sign", "cyclist")
+        classes = ("vehicle", "pedestrian", "cyclist")
     else:
         raise NotImplementedError
     
@@ -24,9 +24,12 @@ def evaluate_list(result_boxes_list,
     
     filter_boxes_fn = lambda x: filter_boxes(x, min_box_diag, min_box_side)
 
+    print("filtering boxes")
     gt_boxes_list = map(filter_boxes_fn, gt_boxes_list)
     # NOTE: We also filter the prediction to follow the prophesee protocol of evaluation.
     result_boxes_list = map(filter_boxes_fn, result_boxes_list)
+
+    print("evaluating")
 
     return evaluate_detection(gt_boxes_list, result_boxes_list,
                               height=height, width=width,

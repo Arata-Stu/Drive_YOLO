@@ -31,6 +31,7 @@ def evaluate_detection(gt_boxes_list, dt_boxes_list, classes=("car", "pedestrian
     :param width: int for box size statistics
     :param time_tol: int size of the temporal window in micro seconds to look for a detection around a gt box
     """
+    print("sorting boxes")
     flattened_gt = []
     flattened_dt = []
     for gt_boxes, dt_boxes in zip(gt_boxes_list, dt_boxes_list):
@@ -43,6 +44,8 @@ def evaluate_detection(gt_boxes_list, dt_boxes_list, classes=("car", "pedestrian
         gt_win, dt_win = _match_times(all_ts, gt_boxes, dt_boxes, time_tol)
         flattened_gt = flattened_gt + gt_win
         flattened_dt = flattened_dt + dt_win
+
+    print("start coco eval")
     return _coco_eval(flattened_gt, flattened_dt, height, width, labelmap=classes, return_aps=return_aps)
 
 

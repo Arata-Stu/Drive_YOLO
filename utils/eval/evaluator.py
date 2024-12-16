@@ -58,9 +58,14 @@ class Evaluator:
             warn("Attempt to use prophesee evaluation buffer, but it is empty", UserWarning, stacklevel=2)
             return
 
+        print("getting labels")
         labels = self._get_from_buffer(self.LABELS)
         predictions = self._get_from_buffer(self.PREDICTIONS)
+
+        print("got labels", len(labels))
         assert len(labels) == len(predictions)
+
+        print("starting evaluation")
         metrics = evaluate_list(result_boxes_list=predictions,
                                 gt_boxes_list=labels,
                                 height=img_height,
