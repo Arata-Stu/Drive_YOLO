@@ -38,15 +38,15 @@ class WaymoSequenceDataset(Dataset):
 
             # 画像データ
             image = frame_data["image"][:]
-            image = np.transpose(image, (2, 0, 1)).astype(np.float32)
+            image = np.transpose(image, (2, 0, 1)).astype(np.uint8)
 
             # バウンディングボックスデータ
             bboxes = frame_data["bboxes"][:]
             if bboxes.size == 0:  # バウンディングボックスがない場合
-                bboxes = np.zeros((0, 5), dtype=np.uint8)
+                bboxes = np.zeros((0, 5), dtype=np.float32)
             else:
                 # 形式変換: cx, cy, w, h, cls -> cls, cx, cy, w, h
-                bboxes = np.hstack((bboxes[:, -1:], bboxes[:, :-1])).astype(np.uint8)
+                bboxes = np.hstack((bboxes[:, -1:], bboxes[:, :-1])).astype(np.float32)
 
             # frame_idの数値部分を抽出 (_ で区切って数字部分を取得)
             frame_number = int(frame_id.split("_")[-1])  # 'frame_001' -> 1
