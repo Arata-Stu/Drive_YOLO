@@ -1,6 +1,9 @@
 model:
   name: yolox-x
   type: dnn
+
+  pretrained: true
+  weight: "yolox_x.pth"
   
   backbone:
     name: darknet

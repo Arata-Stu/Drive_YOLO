@@ -2,6 +2,9 @@ model:
   name: yolox-x
   type: dnn
   
+  pretrained: true
+  weight: "yolox_l.pth"
+
   backbone:
     name: darknet
     depth: 1.00
