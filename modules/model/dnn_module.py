@@ -51,7 +51,7 @@ class DNNModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.started_training = True
         self.model.train()
-        imgs = batch['image'].to(dtype=self.dtype)  
+        imgs = batch['images'].to(dtype=self.dtype)  
         labels = batch['labels'].to(dtype=self.dtype)  
         labels.requires_grad = False
 
@@ -71,7 +71,7 @@ class DNNModule(pl.LightningModule):
         
         self.model.eval()
         
-        imgs = batch['image'].to(dtype=self.dtype)  
+        imgs = batch['images'].to(dtype=self.dtype)  
         labels = batch['labels'].to(dtype=self.dtype)  
         data_id = batch['unique_id']
         labels.requires_grad = False
@@ -105,7 +105,7 @@ class DNNModule(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         self.model.eval()
         
-        imgs = batch['image'].to(dtype=self.dtype)  
+        imgs = batch['images'].to(dtype=self.dtype)  
         labels = batch['labels'].to(dtype=self.dtype)  
         data_id = batch['unique_id']
         labels.requires_grad = False
