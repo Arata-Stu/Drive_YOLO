@@ -16,7 +16,7 @@ class Resize:
         """
         Args:
             inputs: dict
-                "images": ndarray [H, W, C]
+                "images": ndarray [C, H, W]
                 "labels": ndarray [N, 5] (5: cls, cx, cy, w, h)
         Returns:
             dict with resized "images" and updated "labels"
@@ -32,6 +32,9 @@ class Resize:
             raise ValueError("Input dictionary must contain 'labels' key.")
         if not isinstance(labels, np.ndarray):
             raise TypeError("The 'labels' must be a NumPy ndarray.")
+
+        # Convert image from [C, H, W] to [H, W, C]
+        img = np.transpose(img, (1, 2, 0))
 
         # Original image size
         orig_height, orig_width, _ = img.shape
@@ -58,6 +61,9 @@ class Resize:
         labels[:, 2] *= scale_h  # cy
         labels[:, 3] *= scale_w  # w
         labels[:, 4] *= scale_h  # h
+
+        # Convert image back to [C, H, W]
+        resized_img = np.transpose(resized_img, (2, 0, 1))
 
         # Update inputs dictionary
         inputs["images"] = resized_img

@@ -1,7 +1,6 @@
 import numpy as np
 
 class Flip:
-
     def __init__(self, vertical: bool = False, horizontal: bool = False):
         """
         Args:
@@ -15,7 +14,7 @@ class Flip:
         """
         Args:
             inputs: dict
-                "images": ndarray of shape [H, W, C].
+                "images": ndarray of shape [C, H, W].
                 "labels": ndarray of shape [N, 5] (5: cls, cx, cy, w, h).
 
         Returns:
@@ -33,6 +32,8 @@ class Flip:
         if not isinstance(labels, np.ndarray):
             raise TypeError("The 'labels' must be a NumPy ndarray.")
 
+        # Convert image from [C, H, W] to [H, W, C]
+        image = np.transpose(image, (1, 2, 0))
         height, width, _ = image.shape
 
         # Apply vertical flip
@@ -46,6 +47,9 @@ class Flip:
             image = np.flip(image, axis=1)  # Flip along the width axis
             # Update the horizontal position of bounding boxes
             labels[:, 1] = width - labels[:, 1]  # Update cx (center x)
+
+        # Convert image back to [C, H, W]
+        image = np.transpose(image, (2, 0, 1))
 
         inputs['images'] = image
         inputs['labels'] = labels

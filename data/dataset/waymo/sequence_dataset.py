@@ -38,6 +38,7 @@ class WaymoSequenceDataset(Dataset):
 
             # 画像データ
             image = frame_data["image"][:]
+            ## H W C -> C H W
             image = np.transpose(image, (2, 0, 1)).astype(np.uint8)
 
             # バウンディングボックスデータ

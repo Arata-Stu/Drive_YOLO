@@ -21,7 +21,7 @@ class RandomRotate:
         """
         Args:
             inputs: dict
-                - "images": ndarray of shape [H, W, C]
+                - "images": ndarray of shape [C, H, W]
                 - "labels": ndarray of shape [N, 5] (format: [cls, cx, cy, w, h])
 
         Returns:
@@ -50,7 +50,7 @@ class Rotate:
         """
         Args:
             inputs: dict
-                - "images": ndarray of shape [H, W, C]
+                - "images": ndarray of shape [C, H, W]
                 - "labels": ndarray of shape [N, 5] (format: [cls, cx, cy, w, h])
 
         Returns:
@@ -70,6 +70,9 @@ class Rotate:
         if not isinstance(labels, np.ndarray):
             raise TypeError("'labels' must be a NumPy ndarray.")
 
+        # Convert image from [C, H, W] to [H, W, C]
+        image = np.transpose(image, (1, 2, 0))
+
         # 画像サイズを取得
         H, W, _ = image.shape
 
@@ -78,6 +81,9 @@ class Rotate:
 
         # ラベルを回転
         rotated_labels = self.rotate_bboxes(labels, self.angle, W, H)
+
+        # Convert image back to [C, H, W]
+        rotated_image = np.transpose(rotated_image, (2, 0, 1))
 
         # 更新した辞書を返す
         inputs["images"] = rotated_image
