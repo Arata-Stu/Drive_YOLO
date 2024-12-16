@@ -72,11 +72,16 @@ class LabelPad:
             dict: パディングされたサンプル。
         """
         labels = sample["labels"]
-        num_labels = labels.size(0)
 
-        # パディングするためのテンソルを作成
-        padded_labels = torch.zeros((self.max_num_labels, labels.size(1)), dtype=labels.dtype)
-        padded_labels[:num_labels] = labels
+        # ラベルが空の場合でも処理を続行
+        if labels.numel() == 0:
+            # ラベルが空の場合はゼロテンソルで初期化
+            padded_labels = torch.zeros((self.max_num_labels, 5), dtype=torch.float32)
+        else:
+            num_labels = labels.size(0)
+            # パディングするためのテンソルを作成
+            padded_labels = torch.zeros((self.max_num_labels, labels.size(1)), dtype=labels.dtype)
+            padded_labels[:num_labels] = labels
 
         # パディング後のラベルをサンプルにセット
         sample["labels"] = padded_labels
