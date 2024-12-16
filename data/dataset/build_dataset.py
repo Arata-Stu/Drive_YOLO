@@ -16,6 +16,14 @@ def build_dataset(dataset_config: DictConfig, mode: str = 'train'):
     rotate = RandomRotate(min_angle=-6, max_angle=6)
     horizontal_flip = Flip(vertical=False, horizontal=True)
     yolo_box_transform = BoxFormatTransform(mode=mode)
+
+    if mode == 'train':
+        _transform = [img_pad, label_filter, horizontal_flip, rotate, yolo_box_transform, label_pad]
+    elif mode == 'val' or mode == 'test':
+        _transform = [img_pad, label_filter, yolo_box_transform, label_pad]
+    else:
+        NotImplementedError
+        
     _transform = [img_pad, label_filter, horizontal_flip, rotate, yolo_box_transform, label_pad]
 
     transform = transforms.Compose(_transform)
