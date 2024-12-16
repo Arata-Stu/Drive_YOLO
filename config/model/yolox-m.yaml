@@ -1,5 +1,5 @@
 model:
-  name: yolox-x
+  name: yolox-m
   type: dnn
   
   pretrained: true
