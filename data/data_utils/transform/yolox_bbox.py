@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 
 class BoxFormatTransform:
     def __init__(self, mode: str = "train"):
@@ -11,8 +11,9 @@ class BoxFormatTransform:
 
         elif self.mode in ["val", "test"]:
             # val/testモードではラベルを変換
+            labels = sample["labels"]
             transformed_labels = []
-            for label in sample["labels"]:
+            for label in labels:
                 cls, cx, cy, w, h = label
                 # バウンディングボックスを [x, y, w, h, cls] に変換
                 x = cx - w / 2
@@ -20,10 +21,10 @@ class BoxFormatTransform:
                 transformed_labels.append([x, y, w, h, cls])
 
             # ラベルを更新
-            sample["labels"] = torch.tensor(transformed_labels, dtype=torch.float32)
+            sample["labels"] = np.array(transformed_labels, dtype=np.float32)
 
         return sample
-    
+
 class LabelFilter:
     def __init__(self, orig_class, my_class):
         """
@@ -43,18 +44,19 @@ class LabelFilter:
         フィルタリングとクラス整列を適用。
 
         Args:
-            sample (dict): 入力サンプル。
-                - "image": 画像データ (torch.Tensor)。
-                - "labels": バウンディングボックス情報 (torch.Tensor)。
+            inputs (dict): 入力サンプル。
+                - "image": 画像データ (NumPy ndarray)。
+                - "labels": バウンディングボックス情報 (NumPy ndarray)。
                   ラベルフォーマット: [cls, cx, cy, w, h]
 
         Returns:
             dict: フィルタリング後のサンプル。
         """
         labels = inputs["labels"]
-        if labels is not None:
+
+        if labels is not None and len(labels) > 0:
             # 指定したクラスのみ抽出
-            mask = torch.isin(labels[:, 0], torch.tensor(self.allowed_classes, dtype=labels.dtype))
+            mask = np.isin(labels[:, 0], self.allowed_classes)
             filtered_labels = labels[mask]
 
             # クラスIDを新しいIDに整列
