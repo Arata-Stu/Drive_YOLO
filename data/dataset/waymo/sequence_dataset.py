@@ -18,9 +18,6 @@ class WaymoSequenceDataset(Dataset):
         self.transform = transform
         self.data_indices = []
 
-        # 使用するデバイスを設定
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
         # HDF5ファイル名からユニークな数字部分を取得
         self.file_id = int(os.path.splitext(os.path.basename(h5_path))[0])
 
@@ -41,7 +38,7 @@ class WaymoSequenceDataset(Dataset):
 
             # 画像データ
             image = frame_data["image"][:]
-            image = torch.from_numpy(image).permute(2, 0, 1).float().to(self.device)
+            image = np.transpose(image, (2, 0, 1)).astype(np.float32)
 
             # バウンディングボックスデータ
             bboxes = frame_data["bboxes"][:]
@@ -51,16 +48,14 @@ class WaymoSequenceDataset(Dataset):
                 # 形式変換: cx, cy, w, h, cls -> cls, cx, cy, w, h
                 bboxes = np.hstack((bboxes[:, -1:], bboxes[:, :-1])).astype(np.float32)
 
-            bboxes = torch.from_numpy(bboxes).float().to(self.device)
-
             # frame_idの数値部分を抽出 (_ で区切って数字部分を取得)
             frame_number = int(frame_id.split("_")[-1])  # 'frame_001' -> 1
-            unique_id = self.file_id + frame_number
+            unique_id = self.file_id + frame_number * 10e6
 
             outputs = {
-                "images": image,
-                "labels": bboxes,
-                "frame_id": frame_id,
+                "images": image,        # NumPy形式の画像データ
+                "labels": bboxes,       # NumPy形式のバウンディングボックスデータ
+                "frame_id": frame_id,   # フレームID
                 "unique_id": unique_id // 10e6
             }
 

@@ -1,14 +1,13 @@
-import torch
-import torchvision.transforms.functional as F
-from torchvision.transforms.functional import InterpolationMode
+import cv2
+import numpy as np
 from typing import Tuple
 
 class Resize:
-    def __init__(self, target_size: Tuple[int, int], mode: InterpolationMode = InterpolationMode.BILINEAR):
+    def __init__(self, target_size: Tuple[int, int], mode: str = "bilinear"):
         """
         Args:
             target_size: (height, width)
-            mode: 'linear', 'bilinear', 'nearest', 'bicubic', 'area'
+            mode: 'bilinear', 'nearest', 'bicubic', 'area'
         """
         self.target_size = target_size
         self.mode = mode
@@ -17,8 +16,8 @@ class Resize:
         """
         Args:
             inputs: dict
-                "images": Tensor [C, H, W]
-                "labels": Tensor [N, 5] (5: cls, cx, cy, w, h)
+                "images": ndarray [H, W, C]
+                "labels": ndarray [N, 5] (5: cls, cx, cy, w, h)
         Returns:
             dict with resized "images" and updated "labels"
         """
@@ -27,35 +26,38 @@ class Resize:
 
         if img is None:
             raise ValueError("Input dictionary must contain 'images' key.")
-        if not isinstance(img, torch.Tensor):
-            raise TypeError("The 'images' must be a PyTorch Tensor.")
+        if not isinstance(img, np.ndarray):
+            raise TypeError("The 'images' must be a NumPy ndarray.")
         if labels is None:
             raise ValueError("Input dictionary must contain 'labels' key.")
-        if not isinstance(labels, torch.Tensor):
-            raise TypeError("The 'labels' must be a PyTorch Tensor.")
+        if not isinstance(labels, np.ndarray):
+            raise TypeError("The 'labels' must be a NumPy ndarray.")
 
         # Original image size
-        _, orig_height, orig_width = img.shape
+        orig_height, orig_width, _ = img.shape
 
         # Target size
         target_height, target_width = self.target_size
 
-        # Calculate scale factors and new size while maintaining aspect ratio
-        scale = min(target_width / orig_width, target_height / orig_height)
-        new_width = int(orig_width * scale)
-        new_height = int(orig_height * scale)
+        # Calculate scale factors
+        scale_w = target_width / orig_width
+        scale_h = target_height / orig_height
 
-        # Resize image while maintaining aspect ratio
-        resized_img = F.resize(img,  # Add batch dimension
-                                size=(new_height, new_width),
-                                interpolation=self.mode,
-                                antialias=False)
+        # Resize image using OpenCV
+        interpolation = {
+            "nearest": cv2.INTER_NEAREST,
+            "bilinear": cv2.INTER_LINEAR,
+            "bicubic": cv2.INTER_CUBIC,
+            "area": cv2.INTER_AREA
+        }.get(self.mode, cv2.INTER_LINEAR)
 
-        
-        labels[:, 1] = labels[:, 1] * scale 
-        labels[:, 2] = labels[:, 2] * scale 
-        labels[:, 3] *= scale 
-        labels[:, 4] *= scale  
+        resized_img = cv2.resize(img, (target_width, target_height), interpolation=interpolation)
+
+        # Scale bounding box labels
+        labels[:, 1] *= scale_w  # cx
+        labels[:, 2] *= scale_h  # cy
+        labels[:, 3] *= scale_w  # w
+        labels[:, 4] *= scale_h  # h
 
         # Update inputs dictionary
         inputs["images"] = resized_img

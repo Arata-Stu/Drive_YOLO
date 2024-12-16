@@ -1,5 +1,4 @@
-import torch 
-import torch.nn.functional as F
+import numpy as np
 from typing import Tuple
 
 class ImagePad:
@@ -7,8 +6,8 @@ class ImagePad:
         """
         Args:
             target_size: (height, width) - target size
-            mode: 'constant', 'reflect', 'replicate', 'circular' 
-            padding_value: constant padding 用の値 ('constant' )
+            mode: 'constant', 'reflect', 'replicate', 'circular'
+            padding_value: constant padding 用の値 ('constant' の場合)
         """
         self.target_size = target_size
         self.mode = mode
@@ -17,37 +16,46 @@ class ImagePad:
     def __call__(self, inputs):
         """
         inputs: dict
-            "images": Tensor [C, H, W] 
+            "images": NumPy ndarray [C, H, W]
         """
-
-        img = inputs["images"]  # 入力テンソル
+        img = inputs["images"]
 
         if img is None:
             raise ValueError("Input dictionary must contain 'images' key.")
 
-        if not isinstance(img, torch.Tensor):
-            raise TypeError("The 'image' must be a PyTorch Tensor.")
+        if not isinstance(img, np.ndarray):
+            raise TypeError("The 'image' must be a NumPy ndarray.")
 
         _, height, width = img.shape
-
         target_height, target_width = self.target_size
 
-        # 必要なパディングの計算
+        # 必要なパディングを計算
         pad_height = max(0, target_height - height)  # 下方向
         pad_width = max(0, target_width - width)    # 右方向
 
-        # パディング指定 (左, 右, 上, 下)
-        pad = (0, pad_width, 0, pad_height)
+        # パディング指定
+        pad = ((0, 0),  # チャンネル方向はそのまま
+               (0, pad_height),  # 高さ方向
+               (0, pad_width))   # 幅方向
 
-        # パディングの適用
-        if self.mode == 'constant':
-            padded_img = F.pad(img, pad, mode=self.mode, value=self.padding_value)
+        # np.padのモード変換
+        mode = self.mode
+        if mode == "replicate":
+            mode = "edge"
+        elif mode == "circular":
+            mode = "wrap"
+
+        # パディング適用
+        if mode == "constant":
+            padded_img = np.pad(img, pad, mode=mode, constant_values=self.padding_value)
         else:
-            padded_img = F.pad(img, pad, mode=self.mode)
+            padded_img = np.pad(img, pad, mode=mode)
 
-        # パディング後のテンソルを更新
+        # パディング後の画像を更新
         inputs["images"] = padded_img
         return inputs
+
+
 
 class LabelPad:
     def __init__(self, max_num_labels=50):
@@ -59,31 +67,32 @@ class LabelPad:
         """
         self.max_num_labels = max_num_labels
 
-    def __call__(self, sample):
+    def __call__(self, inputs):
         """
         データローダーのサンプルにバウンディングボックスのパディングを適用。
 
         Args:
             sample (dict): 入力サンプル。
-                - "labels": バウンディングボックス情報 (Tensor)
-
+                - "labels": バウンディングボックス情報 (ndarray)
 
         Returns:
             dict: パディングされたサンプル。
         """
-        labels = sample["labels"]
+        labels = inputs["labels"]
 
-        # ラベルが空の場合でも処理を続行
-        if labels.numel() == 0:
-            # ラベルが空の場合はゼロテンソルで初期化
-            padded_labels = torch.zeros((self.max_num_labels, 5), dtype=torch.float32)
+        if not isinstance(labels, np.ndarray):
+            raise TypeError("The 'labels' must be a NumPy ndarray.")
+
+        # ラベルが空の場合
+        if labels.size == 0:
+            padded_labels = np.zeros((self.max_num_labels, 5), dtype=np.float32)
         else:
-            num_labels = labels.size(0)
+            num_labels = labels.shape[0]
             # パディングするためのテンソルを作成
-            padded_labels = torch.zeros((self.max_num_labels, labels.size(1)), dtype=labels.dtype)
+            padded_labels = np.zeros((self.max_num_labels, labels.shape[1]), dtype=labels.dtype)
             padded_labels[:num_labels] = labels
 
         # パディング後のラベルをサンプルにセット
-        sample["labels"] = padded_labels
+        inputs["labels"] = padded_labels
 
-        return sample
+        return inputs
