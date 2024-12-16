@@ -1,14 +1,17 @@
 import numpy as np
+import time
 
 class Flip:
-    def __init__(self, vertical: bool = False, horizontal: bool = False):
+    def __init__(self, vertical: bool = False, horizontal: bool = False, timing: bool = False):
         """
         Args:
             vertical: Whether to enable vertical flipping.
             horizontal: Whether to enable horizontal flipping.
+            timing: Whether to enable timing for the __call__ method.
         """
         self.vertical = vertical
         self.horizontal = horizontal
+        self.timing = timing
 
     def __call__(self, inputs: dict) -> dict:
         """
@@ -20,6 +23,9 @@ class Flip:
         Returns:
             outputs: dict with the flipped image and updated labels.
         """
+        if self.timing:
+            start_time = time.time()
+
         image = inputs.get("images")
         labels = inputs.get("labels")
 
@@ -53,4 +59,9 @@ class Flip:
 
         inputs['images'] = image
         inputs['labels'] = labels
+
+        if self.timing:
+            elapsed_time = time.time() - start_time
+            print(f"Processing time: {elapsed_time:.6f} seconds")
+
         return inputs
