@@ -16,7 +16,7 @@ def build_dataset(dataset_config: DictConfig, mode: str = 'train'):
     label_filter = LabelFilter(orig_class=ORIG_CLASS, my_class=MY_CLASS, timing=use_time)
     rotate = RandomRotate(min_angle=-6, max_angle=6, timing=use_time)
     horizontal_flip = Flip(vertical=False, horizontal=True, timing=use_time)
-    zoom = RandomZoom(prob_weight=(8, 2), in_scale=(1, 1.5), out_scale=(1, 1.2), center_margin_ratio=0.2, timing=use_time)
+    zoom = RandomZoom(prob_weight=(8, 2), in_scale=(1, 1.3), out_scale=(1, 1.2), center_margin_ratio=0.2, timing=use_time)
     yolo_box_transform = BoxFormatTransform(mode=mode, timing=use_time)
 
     if mode == 'train':
