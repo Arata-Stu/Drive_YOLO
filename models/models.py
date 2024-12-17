@@ -8,6 +8,6 @@ def get_detector(model_cfg):
     if model_cfg.pretrained:
         ckpt_path = os.path.join('./config/model/', model_cfg.weight)
         ckpt = torch.load(ckpt_path)
-        model.load_weights(ckpt['model'])
+        model.load_state_dict(ckpt['model'])
 
     return model
