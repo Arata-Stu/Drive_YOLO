@@ -58,7 +58,7 @@ class RandomZoom:
         if zoom_type == "in":
             zoom = Zoom_in(scale=scale, center=center, timing=self.timing)
         else:
-            zoom = Zoom_out(scale=scale, center=center, timing=self.timing)
+            zoom = Zoom_out(scale=scale, center=center, timing=self.timing, background_color=(114, 114, 114))
 
         return zoom(inputs)
 
