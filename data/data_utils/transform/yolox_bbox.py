@@ -12,7 +12,7 @@ class BoxFormatTransform:
 
         if self.mode == "train":
             # trainモードでは何もしない
-            result = inputs
+            pass
 
         elif self.mode in ["val", "test"]:
             # val/testモードではラベルを変換

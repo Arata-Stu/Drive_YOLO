@@ -3,3 +3,4 @@ from .resize import Resize
 from .padding import ImagePad, LabelPad
 from .rotate import RandomRotate
 from .yolox_bbox import BoxFormatTransform, LabelFilter
+from .zoom import RandomZoom
