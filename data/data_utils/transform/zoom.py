@@ -115,10 +115,11 @@ class Zoom_in:
 
     
 class Zoom_out:
-    def __init__(self, scale: float, center: Tuple[int, int] = None, timing: bool = False):
+    def __init__(self, scale: float, center: Tuple[int, int] = None, timing: bool = False, background_color=(0, 0, 0)):
         self.scale = scale
         self.center = center
         self.timing = timing
+        self.background_color = background_color
 
     def __call__(self, inputs):
         if self.timing:
@@ -140,7 +141,7 @@ class Zoom_out:
         resized_image = cv2.resize(image_transposed, (new_W, new_H), interpolation=cv2.INTER_CUBIC)
 
         # Place resized image onto the canvas
-        canvas = np.zeros((H, W, C), dtype=image.dtype)
+        canvas = np.full((H, W, C), self.background_color, dtype=image.dtype)
         cx, cy = self.center if self.center else (W // 2, H // 2)
 
         # Calculate top-left coordinate for placement
@@ -153,14 +154,9 @@ class Zoom_out:
         canvas[y1:y2, x1:x2] = resized_image[0:(y2 - y1), 0:(x2 - x1)]
 
         # Adjust labels for zoom out
-        # Adjust labels for zoom out
         zoomed_labels = labels.copy()
 
         if labels is not None:
-            # Adjust labels for zoom out
-            zoomed_labels = labels.copy()
-
-            # cls, cx, cy, w, h の順番で保存されているため、インデックスでアクセス
             zoomed_labels[:, 1] = (zoomed_labels[:, 1] / self.scale) + x1  # cx の調整
             zoomed_labels[:, 2] = (zoomed_labels[:, 2] / self.scale) + y1  # cy の調整
             zoomed_labels[:, 3] /= self.scale  # w の調整
@@ -183,4 +179,3 @@ class Zoom_out:
             print(f"Processing time: {elapsed_time:.6f} seconds")
 
         return inputs
-
