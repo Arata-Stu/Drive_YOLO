@@ -19,7 +19,6 @@ class YOLOXHead(nn.Module):
     def __init__(
         self,
         num_classes,
-        width=1.0,
         strides=[8, 16, 32],
         in_channels=[256, 512, 1024],
         act="silu",
@@ -43,15 +42,16 @@ class YOLOXHead(nn.Module):
         self.stems = nn.ModuleList()
         Conv = DWConv if depthwise else BaseConv
 
-        largest_base_dim_yolox = 1024
+        largest_base_dim_yolox = 1280
         largest_base_dim_from_input = in_channels[-1]
         width = largest_base_dim_from_input/largest_base_dim_yolox
+        print('width:', width)
         hidden_dim = int(256*width)
 
         for i in range(len(in_channels)):
             self.stems.append(
                 BaseConv(
-                    in_channels=hidden_dim,
+                    in_channels=in_channels[i],
                     out_channels=hidden_dim,
                     ksize=1,
                     stride=1,
