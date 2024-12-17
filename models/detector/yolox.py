@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from ..build import build_backbone, build_head, build_neck
 
 class YOLOXDetector(nn.Module):
-    def __init__(self,
-                 model_cfg: DictConfig):
+    def __init__(self, model_cfg: DictConfig):
         super().__init__()
         backbone_cfg = model_cfg.backbone
         neck_cfg = model_cfg.neck
@@ -14,19 +13,21 @@ class YOLOXDetector(nn.Module):
 
         self.backbone = build_backbone(backbone_cfg)
 
-        if neck_cfg.in_channels is None:
+        # neck_cfg.in_channels が ??? かどうかを判定
+        if OmegaConf.is_missing(neck_cfg, "in_channels"):
             in_channels = self.backbone.get_stage_dims(neck_cfg.in_stages)
         else:
             in_channels = neck_cfg.in_channels
 
         print('inchannels:', in_channels)
         self.neck = build_neck(neck_cfg, in_channels=in_channels)
-        
-        if head_cfg.strides is None:
+
+        # head_cfg.strides が ??? かどうかを判定
+        if OmegaConf.is_missing(head_cfg, "strides"):
             strides = self.backbone.get_strides(neck_cfg.in_stages)
         else:
             strides = head_cfg.strides
-            
+
         print('strides:', strides)
         self.head = build_head(head_cfg, in_channels=in_channels, strides=strides)
 

@@ -43,11 +43,16 @@ class YOLOXHead(nn.Module):
         self.stems = nn.ModuleList()
         Conv = DWConv if depthwise else BaseConv
 
+        largest_base_dim_yolox = 1024
+        largest_base_dim_from_input = in_channels[-1]
+        width = largest_base_dim_from_input/largest_base_dim_yolox
+        hidden_dim = int(256*width)
+
         for i in range(len(in_channels)):
             self.stems.append(
                 BaseConv(
-                    in_channels=int(in_channels[i] * width),
-                    out_channels=int(256 * width),
+                    in_channels=hidden_dim,
+                    out_channels=hidden_dim,
                     ksize=1,
                     stride=1,
                     act=act,
@@ -57,15 +62,15 @@ class YOLOXHead(nn.Module):
                 nn.Sequential(
                     *[
                         Conv(
-                            in_channels=int(256 * width),
-                            out_channels=int(256 * width),
+                            in_channels=hidden_dim,
+                            out_channels=hidden_dim,
                             ksize=3,
                             stride=1,
                             act=act,
                         ),
                         Conv(
-                            in_channels=int(256 * width),
-                            out_channels=int(256 * width),
+                            in_channels=hidden_dim,
+                            out_channels=hidden_dim,
                             ksize=3,
                             stride=1,
                             act=act,
@@ -77,15 +82,15 @@ class YOLOXHead(nn.Module):
                 nn.Sequential(
                     *[
                         Conv(
-                            in_channels=int(256 * width),
-                            out_channels=int(256 * width),
+                            in_channels=hidden_dim,
+                            out_channels=hidden_dim,
                             ksize=3,
                             stride=1,
                             act=act,
                         ),
                         Conv(
-                            in_channels=int(256 * width),
-                            out_channels=int(256 * width),
+                            in_channels=hidden_dim,
+                            out_channels=hidden_dim,
                             ksize=3,
                             stride=1,
                             act=act,
@@ -95,7 +100,7 @@ class YOLOXHead(nn.Module):
             )
             self.cls_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=hidden_dim,
                     out_channels=self.num_classes,
                     kernel_size=1,
                     stride=1,
@@ -104,7 +109,7 @@ class YOLOXHead(nn.Module):
             )
             self.reg_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=hidden_dim,
                     out_channels=4,
                     kernel_size=1,
                     stride=1,
@@ -113,7 +118,7 @@ class YOLOXHead(nn.Module):
             )
             self.obj_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=hidden_dim,
                     out_channels=1,
                     kernel_size=1,
                     stride=1,
