@@ -14,11 +14,19 @@ class YOLOXDetector(nn.Module):
 
         self.backbone = build_backbone(backbone_cfg)
 
-        in_channels = self.backbone.get_stage_dims(neck_cfg.in_stages)
+        if neck_cfg.in_channels is None:
+            in_channels = self.backbone.get_stage_dims(neck_cfg.in_stages)
+        else:
+            in_channels = neck_cfg.in_channels
+
         print('inchannels:', in_channels)
         self.neck = build_neck(neck_cfg, in_channels=in_channels)
         
-        strides = self.backbone.get_strides(neck_cfg.in_stages)
+        if head_cfg.strides is None:
+            strides = self.backbone.get_strides(neck_cfg.in_stages)
+        else:
+            strides = head_cfg.strides
+            
         print('strides:', strides)
         self.head = build_head(head_cfg, in_channels=in_channels, strides=strides)
 
