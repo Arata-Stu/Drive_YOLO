@@ -122,7 +122,7 @@ def to_prophesee(
 
         # 全てのラベルが0ならバッチ全体をスキップ
         if valid_labels.numel() == 0:
-            print(f"Batch {i}: No valid labels, skipping batch.")
+            # print(f"Batch {i}: No valid labels, skipping batch.")
             continue
 
         # ラベルとYOLOX予測の処理
@@ -130,7 +130,7 @@ def to_prophesee(
         loaded_label_list_proph.append(labels_proph)
 
         if yolox_preds is None or (isinstance(yolox_preds, th.Tensor) and yolox_preds.numel() == 0):
-            print(f"Batch {i}: No YOLOX predictions, skipping prediction processing.")
+            # print(f"Batch {i}: No YOLOX predictions, skipping prediction processing.")
             yolox_pred_list_proph.append(np.array([]))
         else:
             yolox_pred_proph = process_yolox_preds(yolox_preds, time)
