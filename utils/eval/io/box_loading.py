@@ -117,12 +117,23 @@ def to_prophesee(
         time = int(label_timestamps[i].item())
         yolox_preds = yolox_pred_list[i]  # Could be None or a tensor of shape (num_preds, 7)
 
-        # Process labels for the current timestamp
-        labels_proph = process_labels(labels, time)
+        # フィルタリング: 全要素が0.0のラベルを除外
+        valid_labels = labels[~(labels == 0.0).all(dim=1)]
+
+        # 全てのラベルが0ならバッチ全体をスキップ
+        if valid_labels.numel() == 0:
+            print(f"Batch {i}: No valid labels, skipping batch.")
+            continue
+
+        # ラベルとYOLOX予測の処理
+        labels_proph = process_labels(valid_labels, time)
         loaded_label_list_proph.append(labels_proph)
 
-        # Process YOLOX predictions for the current timestamp
-        yolox_pred_proph = process_yolox_preds(yolox_preds, time)
-        yolox_pred_list_proph.append(yolox_pred_proph)
+        if yolox_preds is None or (isinstance(yolox_preds, th.Tensor) and yolox_preds.numel() == 0):
+            print(f"Batch {i}: No YOLOX predictions, skipping prediction processing.")
+            yolox_pred_list_proph.append(np.array([]))
+        else:
+            yolox_pred_proph = process_yolox_preds(yolox_preds, time)
+            yolox_pred_list_proph.append(yolox_pred_proph)
 
     return loaded_label_list_proph, yolox_pred_list_proph
