@@ -129,11 +129,8 @@ def to_prophesee(
         labels_proph = process_labels(valid_labels, time)
         loaded_label_list_proph.append(labels_proph)
 
-        if yolox_preds is None or (isinstance(yolox_preds, th.Tensor) and yolox_preds.numel() == 0):
-            # print(f"Batch {i}: No YOLOX predictions, skipping prediction processing.")
-            yolox_pred_list_proph.append(np.array([]))
-        else:
-            yolox_pred_proph = process_yolox_preds(yolox_preds, time)
-            yolox_pred_list_proph.append(yolox_pred_proph)
+        
+        yolox_pred_proph = process_yolox_preds(yolox_preds, time)
+        yolox_pred_list_proph.append(yolox_pred_proph)
 
     return loaded_label_list_proph, yolox_pred_list_proph
